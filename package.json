@@ -1,0 +1,16 @@
+{
+  "name": "vortex-nexus-mod-browser",
+  "version": "0.6.3",
+  "private": true,
+  "description": "Vortex extension: browse and download Nexus Mods from inside the mod manager",
+  "scripts": {
+    "build": "node scripts/tsbuild.js",
+    "typecheck": "node scripts/tsbuild.js --noEmit",
+    "copyplugin": "node scripts/install.js",
+    "uninstall": "node scripts/uninstall.js",
+    "package": "node scripts/pack.js"
+  },
+  "devDependencies": {},
+  "license": "MIT",
+  "author": "MC10086AAA"
+}

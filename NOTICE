@@ -1,0 +1,20 @@
+Nexus Mod Browser — 第三方资源说明
+====================================
+
+本项目自身代码以 MIT 许可证发布（见 LICENSE）。
+
+1. Material Design Icons
+   - 用途：`src/ui/icons.tsx` 中内联的 SVG 图标路径
+   - 来源：@mdi/js（Material Design Icons）
+   - 许可证：Apache License 2.0
+   - 说明：仅内联了十余条 path 数据，未随包分发完整的图标库。
+
+2. Vortex 的 CSS 类名与设计令牌
+   - 本扩展在运行时使用 Vortex 自带的全局样式类（`nxm-button`、`nxm-modal`、
+     `bg-surface-mid` 等）以获得与原界面一致的外观。
+   - 本项目**不包含** Vortex 的源代码，也不复制其 GPL-3.0 代码；仅在使用其公开的
+     CSS 类名与设计令牌（类名与样式由宿主在运行时提供）。
+
+3. Nexus Mods 的接口
+   - 本扩展通过 Nexus Mods 官方 GraphQL API 读取公开数据，并调用 Vortex 的下载管道。
+   - 与 Nexus Mods 官方无隶属关系，"Nexus Mods" 为其各自所有者的商标。

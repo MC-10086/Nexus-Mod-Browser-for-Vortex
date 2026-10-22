@@ -1,0 +1,19 @@
+# 构建产物
+dist/
+build/
+release/
+node_modules/
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+
+# 本地临时
+*.tmp
+*.bak
