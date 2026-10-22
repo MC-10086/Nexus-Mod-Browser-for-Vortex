@@ -24,7 +24,11 @@
 
 ## 安装
 
-**方式 A（最省事）**：在 Nexus Mods 的 **Modding Tools → Vortex Extensions** 页面，点主文件右侧的 **Download with Vortex**，Vortex 会自动接管，按提示重启即可。
+**方式 A（最省事）**：
+
+1. 在 Nexus Mods 的 **Modding Tools → Vortex Extensions** 页面，切到 **Files** 标签，点主文件的 **Download with Vortex**（用 Mod 管理器下载）
+2. 会自动拉起 Vortex，在弹出的窗口里点 **安装（Install）**
+3. 下载完成后重启 Vortex
 
 **方式 B（最稳）**：下载压缩包 → 打开 Vortex 的「扩展（Extensions）」页面 → **把压缩包拖进该页面** → 按提示重启 Vortex。
 
