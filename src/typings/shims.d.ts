@@ -1,7 +1,7 @@
 /**
  * 极简类型声明（shim）
  * ---------------------------------------------------------------------------
- * 本项目刻意不依赖 `@types/react` / `@types/node`，原因见 HANDOVER.md「构建体系」一节：
+ * 本项目刻意不依赖 `@types/react` / `@types/node`，原因：
  * 目标机器可能没有网络，而 VS Code 自带 TypeScript 编译器可以直接离线编译。
  * 这里只声明我们真正用到的 React / Node API 子集，类型为宽泛的 any，够用即可。
  *
@@ -108,7 +108,7 @@ declare namespace JSX {
 }
 
 /**
- * 宿主在运行时提供的模块（见 HANDOVER §6.1）。
+ * 宿主在运行时提供的模块（由 Vortex 注入，不需要安装）。
  * Vortex 劫持了 Module.prototype.require，扩展里 require("@nexusmods/vortex-api")
  * 会拿到宿主内部 api 模块的 Proxy，因此这些导入在真实环境可用。
  * 这里只声明我们真正用到的成员，类型从宽（any），避免引入完整类型包。

@@ -160,6 +160,7 @@ if (sevenZip !== undefined) {
       "-xr!release",
       "-xr!node_modules",
       "-xr!.git",
+      "-x!HANDOVER.md",
     ],
     { cwd: projectRoot, stdio: "inherit" },
   );

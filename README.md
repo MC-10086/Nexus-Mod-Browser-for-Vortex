@@ -85,11 +85,26 @@
 - `docs/01-Vortex插件开发接口与方法.md` —— Vortex 扩展系统的接口、事件、下载管道、打包分发
 - `docs/02-插件可行性评估与实施方案.md` —— 本插件的可行性分析、架构与实施路线
 
-构建方式见 `HANDOVER.md`（零依赖：用 TypeScript 编译器直接输出 CommonJS，不需要 npm install）。
+## 如何构建
+
+仓库不含构建产物（`dist/` 已被忽略），克隆后自己编译一次即可。**没有任何 npm 依赖**，不需要 `npm install`：
+
+```
+node scripts/tsbuild.js     # 编译到 dist/
+node scripts/selftest.js    # 运行单元测试
+node scripts/smoketest.js   # 渲染冒烟测试
+node scripts/pack.js        # 打包成可上传的 zip（输出到 release/）
+node scripts/install.js     # 直接装到本机 %APPDATA%\Vortex\plugins\ 做本地测试
+```
+
+要求：本机装有 Node.js，以及任意一份 TypeScript（脚本会自动找 VS Code 自带的 tsc，找不到就用 PATH 里的）。
 
 ## 许可证
 
 MIT，见 [LICENSE](LICENSE)。第三方资源说明见 [NOTICE](NOTICE)。
+
+**你可以自由地使用、修改、再发布这个插件**（包括修改后闭源发布），只需保留版权声明与许可证文本。
+欢迎基于它做自己的版本 —— 改个名字直接发也可以。
 
 ## 问题反馈
 

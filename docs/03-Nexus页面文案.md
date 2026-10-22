@@ -243,7 +243,7 @@ A: The badge is based on the Nexus mod ID stored by Vortex. Mods installed from 
 | File 名称 | **必须包含单词 `Extension`**（见下方说明） |
 | Main files | 只放一个：`Nexus Mod Browser - Vortex Extension 0.6.3.zip` |
 | Tags | Vortex, Mod Manager, Utility, Browser |
-| Permissions | 允许转载/修改需署名（按 MIT 即可） |
+| Permissions | **允许修改、允许转载、允许在其他项目中使用**（署名即可，与 MIT 一致） |
 
 ## 四、截图建议（3–5 张，16:9）
 

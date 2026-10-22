@@ -14,6 +14,9 @@ Thumbs.db
 # 日志
 *.log
 
+# 交接报告（仅本地保留，不进仓库）
+HANDOVER.md
+
 # 本地临时
 *.tmp
 *.bak
