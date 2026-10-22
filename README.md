@@ -24,12 +24,14 @@
 
 ## 安装
 
-1. 在 Nexus Mods 的 **Modding Tools → Vortex Extensions** 分类下载本扩展的压缩包；
-2. 打开 Vortex，进入「扩展（Extensions）」页面，**把压缩包拖进该页面**；
-3. 按提示重启 Vortex。
+**方式 A（最省事）**：在 Nexus Mods 的 **Modding Tools → Vortex Extensions** 页面，点主文件右侧的 **Download with Vortex**，Vortex 会自动接管，按提示重启即可。
 
-手动安装：把压缩包解压到 `%APPDATA%\Vortex\plugins\nexus-mod-browser\`
+**方式 B（最稳）**：下载压缩包 → 打开 Vortex 的「扩展（Extensions）」页面 → **把压缩包拖进该页面** → 按提示重启 Vortex。
+
+**方式 C（手动）**：把压缩包解压到 `%APPDATA%\Vortex\plugins\nexus-mod-browser\`
 （确保该目录下直接有 `info.json` 和 `index.js`）。
+
+> 方式 A 依赖文件名里带 `Extension`（Vortex 用它判断这是扩展而不是游戏 MOD）；现在的发布包已满足，若遇到旧文件请改用方式 B。
 
 ## 使用
 
