@@ -26,8 +26,6 @@ export interface IRequirementsDialogData {
   modName: string;
   rows: IRequirementRow[];
   dlc: IDlcRow[];
-  /** 免费账号：确认后会逐个打开浏览器页面 */
-  freeAccount: boolean;
   /** 默认勾选（未安装的前置） */
   defaultSelected: number[];
 }
@@ -371,15 +369,6 @@ export default function RequirementsDialog(props: IRequirementsDialogProps) {
                   插件无法检测 DLC 是否已安装，请自行确认。
                 </p>
               </div>
-            )
-            : null}
-
-          {data.freeAccount
-            ? (
-              <p className="border-t border-stroke-weak py-2 text-body-xs text-info-strong">
-                当前是免费账号：确认后会逐个打开浏览器页面，每个前置都需要在网页上点一次
-                「Mod manager download」。
-              </p>
             )
             : null}
         </div>

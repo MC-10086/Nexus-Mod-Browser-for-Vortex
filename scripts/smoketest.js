@@ -574,7 +574,6 @@ const DETAIL = {
       modName: "SkyUI",
       rows,
       dlc: reqUtil.buildDlcRows(info),
-      freeAccount: true,
       defaultSelected: reqUtil.defaultSelectedModIds(rows),
     },
     onDecision: (decision) => decisions.push(decision),
@@ -648,8 +647,8 @@ const DETAIL = {
   const text = textOf(tree).replace(/\s+/g, " ");
   assert.ok(text.indexOf("还需要以下 DLC") !== -1, "应提示 DLC");
   assert.ok(text.indexOf("Saints & Seducers") !== -1, "DLC 名应解码显示");
-  assert.ok(text.indexOf("当前是免费账号") !== -1, "免费账号应提示会开浏览器");
-  assert.ok(text.indexOf("Mod manager download") !== -1, "免费提示应使用 N 网按钮的正确文案");
+  assert.strictEqual(text.indexOf("当前是免费账号"), -1, "前置弹窗不应再显示免费账号说明");
+  assert.strictEqual(text.indexOf("Mod manager download"), -1, "前置弹窗不应再显示免费下载说明");
   assert.ok(text.indexOf("不再提醒") !== -1, "应有『不再提醒』选项");
   assert.ok(text.indexOf("Download selected (2)") !== -1, "主按钮应显示已选数量");
 

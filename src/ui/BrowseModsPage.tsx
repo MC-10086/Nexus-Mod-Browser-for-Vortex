@@ -363,7 +363,6 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
           modName: mod.name,
           installed: installedNexusMods(current, internalGameId),
           manual: manualRequirementIds(current, currentDomain),
-          freeAccount,
         });
 
         if (promptData !== undefined) {

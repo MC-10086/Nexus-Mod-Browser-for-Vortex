@@ -161,7 +161,6 @@ const requirementsTree = RequirementsDialog({
     modName: "SkyUI",
     rows: REQUIREMENT_ROWS,
     dlc: reqUtil.buildDlcRows(REQUIREMENT_INFO),
-    freeAccount: false,
     defaultSelected: reqUtil.defaultSelectedModIds(REQUIREMENT_ROWS),
   },
   onDecision: () => undefined,

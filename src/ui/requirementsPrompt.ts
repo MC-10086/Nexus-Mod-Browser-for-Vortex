@@ -39,7 +39,6 @@ export interface IBuildPromptOptions extends IRequirementsContext {
   modName: string;
   installed: Map<number, IInstalledNexusMod>;
   manual: number[];
-  freeAccount: boolean;
 }
 
 /** 是否是免费账号（会员信息没加载出来时按"未知"处理，不显示免费提示） */
@@ -95,7 +94,6 @@ export async function buildRequirementsPromptData(
     modName: options.modName,
     rows,
     dlc,
-    freeAccount: options.freeAccount,
     defaultSelected: defaultSelectedModIds(rows),
   };
 }

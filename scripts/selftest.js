@@ -1435,7 +1435,6 @@ async function main() {
       modName: "A Mod",
       installed: new Map(),
       manual: [],
-      freeAccount: false,
     });
 
     assert.ok(data, "应返回弹窗数据");
@@ -1444,7 +1443,7 @@ async function main() {
     assert.deepStrictEqual(data.defaultSelected, [30379]);
     assert.strictEqual(data.dlc.length, 1);
     assert.strictEqual(data.dlc[0].name, "Saints & Seducers");
-    assert.strictEqual(data.freeAccount, false);
+    assert.strictEqual(data.freeAccount, undefined, "弹窗数据不再带免费账号字段");
   });
 
   console.log(`\n通过 ${passed} 项。`);
