@@ -31,6 +31,8 @@ import { Icon } from "./icons";
 export interface IModDetailDialogProps {
   /** 列表里的卡片数据：弹窗一打开就能显示标题/主图，不必等详情回来 */
   summary?: IModSummary;
+  /** 没有 summary 时的兜底标题（例如从「前置」行打开详情） */
+  title?: string;
   /** modDetail() 的结果；undefined 表示还在加载 */
   detail?: IModDetail;
   /** 详情加载失败时的文案 */
@@ -99,7 +101,7 @@ function renderBBCode(text: string): any {
 }
 
 export default function ModDetailDialog(props: IModDetailDialogProps) {
-  const { summary, detail, error, onClose, onRetry } = props;
+  const { summary, title, detail, error, onClose, onRetry } = props;
 
   // ESC / 关闭按钮的回调放进 ref：effect 只挂一次，避免每次渲染重装监听
   const closeRef = React.useRef(onClose);
@@ -136,7 +138,8 @@ export default function ModDetailDialog(props: IModDetailDialogProps) {
 
   // 详情优先；没有详情时用列表数据顶着（标题/主图/元信息先出来）
   const mod: any = detail ?? summary;
-  const name: string = (mod !== undefined && mod !== null ? mod.name : undefined) ?? "Mod details";
+  const name: string =
+    (mod !== undefined && mod !== null ? mod.name : undefined) ?? title ?? "Mod details";
   const meta = detailMeta(mod);
 
   /**

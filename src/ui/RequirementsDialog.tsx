@@ -48,6 +48,10 @@ export interface IRequirementsDialogProps {
   onDownloadOne: (row: IRequirementRow) => Promise<boolean>;
   /** 打开前置的 Nexus 页面 */
   onViewPage: (row: IRequirementRow) => void;
+  /** 打开前置的详情弹窗（同一个游戏、有 Nexus modId 的行才提供） */
+  onDetails: (row: IRequirementRow) => void;
+  /** 详情弹窗叠在上面时，禁用本弹窗的 ESC，避免一次 ESC 把两层都关掉 */
+  escDisabled?: boolean;
 }
 
 /** 宿主新 UI 的勾选框（DOM 结构与 .nxm-checkbox 的 CSS 对齐） */
@@ -105,7 +109,7 @@ function statusClass(row: IRequirementRow, ignored: boolean): string {
 }
 
 export default function RequirementsDialog(props: IRequirementsDialogProps) {
-  const { data, onDecision, onDownloadOne, onViewPage } = props;
+  const { data, onDecision, onDownloadOne, onViewPage, onDetails, escDisabled } = props;
 
   const [selected, setSelected] = React.useState<number[]>(() => data.defaultSelected.slice());
   const [ignored, setIgnored] = React.useState<number[]>(() =>
@@ -120,15 +124,20 @@ export default function RequirementsDialog(props: IRequirementsDialogProps) {
   const allSelected =
     selectableRows.length > 0 && selectableRows.every((row) => selected.indexOf(row.modId) !== -1);
 
-  // ESC = 取消整个操作（不是跳过）
+  // ESC = 取消整个操作（不是跳过）；详情弹窗打开时由详情弹窗处理
   const cancelRef = React.useRef(onDecision);
   cancelRef.current = onDecision;
+  const escDisabledRef = React.useRef(escDisabled === true);
+  escDisabledRef.current = escDisabled === true;
 
   React.useEffect(() => {
     if (typeof document === "undefined") {
       return undefined;
     }
     const onKeyDown = (evt: any) => {
+      if (escDisabledRef.current) {
+        return;
+      }
       if (evt !== null && evt !== undefined && (evt.key === "Escape" || evt.keyCode === 27)) {
         evt.preventDefault?.();
         cancelRef.current({ kind: "cancel", selected: [], ignored: [] });
@@ -328,6 +337,21 @@ export default function RequirementsDialog(props: IRequirementsDialogProps) {
                   >
                     View page
                   </Button>
+
+                  {row.modId > 0 && row.kind !== "otherGame"
+                    ? (
+                      <Button
+                        size="sm"
+                        brand="neutral"
+                        appearance="weak"
+                        icon="details"
+                        title="View details"
+                        onClick={() => onDetails(row)}
+                      >
+                        Details
+                      </Button>
+                    )
+                    : null}
                 </div>
               </div>
             );

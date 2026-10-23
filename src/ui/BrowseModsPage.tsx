@@ -23,7 +23,7 @@ import { describeError } from "../nexus/client";
 import { getNexusService, resetNexusService } from "../nexus/index";
 import { actions, nexusBrowserSlice } from "../state/reducer";
 import { manualRequirementIds, prefsActions } from "../state/prefs";
-import { IModSummary } from "../types";
+import { IModDetail, IModSummary } from "../types";
 import { activeGameId, gameName, isPremium, nexusDomain } from "../util/game";
 import { installedNexusModIds, installedNexusMods } from "../util/mods";
 import { gameModsUrl, modPageUrl, openExternal } from "../util/openExternal";
@@ -50,6 +50,13 @@ import { Button, Pagination, SortMenu, TabBar, TabButton } from "./primitives";
 
 export interface IBrowseModsPageProps {
   api: any;
+}
+
+interface IRequirementDetailState {
+  row: IRequirementRow;
+  detail?: IModDetail;
+  error?: string;
+  loading: boolean;
 }
 
 export default function BrowseModsPage(props: IBrowseModsPageProps) {
@@ -84,6 +91,10 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
    * 防止免费账号在弹窗还没出来时重复点 Download，把 Promise 桥接覆盖掉。
    */
   const requirementsInFlightRef = React.useRef<number[]>([]);
+  /** 前置的详情弹窗（叠加在前置弹窗之上） */
+  const [requirementDetail, setRequirementDetail] = React.useState<
+    IRequirementDetailState | undefined
+  >(undefined);
 
   // 订阅 store：只有我们的切片引用变了才重渲染
   React.useEffect(() => {
@@ -237,7 +248,47 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
     const resolve = requirementsResolveRef.current;
     requirementsResolveRef.current = undefined;
     setRequirements(undefined);
+    setRequirementDetail(undefined);
     resolve?.(decision);
+  };
+
+  // ---------------------------------------------------------------------------
+  // 前置详情：叠加在地前置弹窗之上，复用详情弹窗组件
+  // ---------------------------------------------------------------------------
+
+  const openRequirementDetail = (row: IRequirementRow) => {
+    const current = api.getState();
+    const internalGameId = activeGameId(current);
+    const currentDomain = nexusDomain(current, internalGameId);
+
+    if (currentDomain === undefined || row.modId <= 0) {
+      return;
+    }
+
+    setRequirementDetail({ row, loading: true });
+
+    getNexusService(api)
+      .modDetail(currentDomain, row.modId)
+      .then((detail) => {
+        setRequirementDetail((prev) =>
+          prev !== undefined && prev.row.modId === row.modId
+            ? { row, detail, loading: false }
+            : prev,
+        );
+      })
+      .catch((err) => {
+        setRequirementDetail((prev) =>
+          prev !== undefined && prev.row.modId === row.modId
+            ? { row, error: describeError(err), loading: false }
+            : prev,
+        );
+      });
+  };
+
+  const retryRequirementDetail = () => {
+    if (requirementDetail !== undefined) {
+      openRequirementDetail(requirementDetail.row);
+    }
   };
 
   /** 弹窗里某一行的 Download：立刻开始，不等主 MOD 流程 */
@@ -623,6 +674,21 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
             onDecision={finishRequirements}
             onDownloadOne={handleRequirementDownloadOne}
             onViewPage={handleRequirementViewPage}
+            onDetails={openRequirementDetail}
+            escDisabled={requirementDetail !== undefined}
+          />
+        )
+        : null}
+
+      {/* 前置详情：叠在前置弹窗之上；ESC 只关这一层 */}
+      {requirementDetail !== undefined
+        ? (
+          <ModDetailDialog
+            title={requirementDetail.row.name}
+            detail={requirementDetail.detail}
+            error={requirementDetail.error}
+            onClose={() => setRequirementDetail(undefined)}
+            onRetry={retryRequirementDetail}
           />
         )
         : null}

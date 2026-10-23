@@ -566,6 +566,7 @@ const DETAIL = {
   const decisions = [];
   const downloads = [];
   const views = [];
+  const details = [];
 
   React.__resetHooks();
   const tree = RequirementsDialog({
@@ -582,6 +583,7 @@ const DETAIL = {
       return true;
     },
     onViewPage: (row) => views.push(row.modId),
+    onDetails: (row) => details.push(row.modId),
   });
   React.__runCleanups();
 
@@ -675,6 +677,15 @@ const DETAIL = {
   // View page 打开链接
   viewButtons[0].props.onClick();
   assert.deepStrictEqual(views, [30379], "View page 应打开对应页面");
+
+  // Details：同一个游戏且有 Nexus modId 的行（SKSE / USSEP / PapyrusUtil / 已安装）
+  const detailButtons = findAll(
+    tree,
+    (el) => el.type === "button" && textOf(el).trim() === "Details",
+  );
+  assert.strictEqual(detailButtons.length, 4, "站外/其他游戏行不应有 Details");
+  detailButtons[0].props.onClick();
+  assert.deepStrictEqual(details, [30379], "Details 应把行传给页面");
 
   // 右上角 × = Cancel
   const closeButton = findAll(

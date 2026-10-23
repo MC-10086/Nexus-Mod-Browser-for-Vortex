@@ -167,6 +167,7 @@ const requirementsTree = RequirementsDialog({
   onDecision: () => undefined,
   onDownloadOne: async () => true,
   onViewPage: () => undefined,
+  onDetails: () => undefined,
 });
 React.__runCleanups();
 
