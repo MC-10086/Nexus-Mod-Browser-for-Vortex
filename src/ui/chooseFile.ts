@@ -98,8 +98,11 @@ export async function chooseModFile(
     },
     [
       { label: CHOOSE_FILE_ACTION.cancel },
-      // Download = 默认主按钮，Cancel 保持灰色次要按钮（与前置弹窗 Skip 的风格一致）
-      { label: CHOOSE_FILE_ACTION.download, default: true },
+      // 不设 default：宿主会给默认按钮加 autoFocus，弹窗一打开 Download 就一直
+      // 处于聚焦高亮状态，直到用户点了某个文件。这个弹窗本来就要先选文件，
+      // 不需要默认按钮；去掉后两个按钮都是普通按钮，点击/回车逻辑不变（回车不再
+      // 直接确认，必须点 Download）。
+      { label: CHOOSE_FILE_ACTION.download },
     ],
   );
 

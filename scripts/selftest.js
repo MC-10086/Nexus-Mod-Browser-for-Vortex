@@ -828,9 +828,9 @@ async function main() {
     assert.strictEqual(preselected[0].id, "file-12", "预选 primary=1 的那个");
     assert.ok(content.choices[0].subText.indexOf("主文件") !== -1, "副标题应带分类");
     assert.strictEqual(actions[1].label, CHOOSE_FILE_ACTION.download);
-    // Download 是默认主按钮 → Cancel 保持灰色次要按钮
-    assert.strictEqual(actions[0].default, undefined, "Cancel 不应是主按钮");
-    assert.strictEqual(actions[1].default, true, "Download 应是默认主按钮");
+    // 不设默认按钮：避免宿主 autoFocus 让 Download 一直高亮
+    assert.strictEqual(actions[0].default, undefined, "Cancel 不应是默认按钮");
+    assert.strictEqual(actions[1].default, undefined, "Download 也不应设默认，避免 autoFocus");
     // 文案是英文（零宽空格只是为了绕开宿主 i18n，不显示出来）
     assert.strictEqual(actions[0].label.replace(/\u200B/g, ""), "Cancel");
     assert.strictEqual(actions[1].label.replace(/\u200B/g, ""), "Download");
