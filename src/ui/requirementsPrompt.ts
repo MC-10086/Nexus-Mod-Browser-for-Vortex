@@ -41,7 +41,7 @@ export interface IBuildPromptOptions extends IRequirementsContext {
   manual: number[];
 }
 
-/** 是否是免费账号（会员信息没加载出来时按"未知"处理，不显示免费提示） */
+/** 是否是免费账号（会员信息没加载出来时按"未知"处理，下载走非免费路径） */
 export function isFreeAccount(state: any): boolean {
   const info = state?.persistent?.nexus?.userInfo;
   return info !== undefined && info !== null && info.isPremium === false;

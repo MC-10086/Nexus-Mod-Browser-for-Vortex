@@ -56,7 +56,6 @@ interface IRequirementDetailState {
   row: IRequirementRow;
   detail?: IModDetail;
   error?: string;
-  loading: boolean;
 }
 
 export default function BrowseModsPage(props: IBrowseModsPageProps) {
@@ -265,21 +264,21 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
       return;
     }
 
-    setRequirementDetail({ row, loading: true });
+    setRequirementDetail({ row });
 
     getNexusService(api)
       .modDetail(currentDomain, row.modId)
       .then((detail) => {
         setRequirementDetail((prev) =>
           prev !== undefined && prev.row.modId === row.modId
-            ? { row, detail, loading: false }
+            ? { row, detail }
             : prev,
         );
       })
       .catch((err) => {
         setRequirementDetail((prev) =>
           prev !== undefined && prev.row.modId === row.modId
-            ? { row, error: describeError(err), loading: false }
+            ? { row, error: describeError(err) }
             : prev,
         );
       });
