@@ -35,6 +35,18 @@ export const SEARCH_DEBOUNCE_MS = 350;
 /** 搜索结果 / 详情缓存时间 */
 export const CACHE_TTL_MS = 5 * 60 * 1000;
 
+/** 前置清单缓存时间（前置很少变，30 分钟足够；避免每次点下载都查一次） */
+export const REQUIREMENTS_CACHE_TTL_MS = 30 * 60 * 1000;
+
+/** 前置清单最多显示多少行（服务端一次取 50，正常用不到截断） */
+export const REQUIREMENTS_MAX_ROWS = 50;
+
+/**
+ * 下载前查前置的最长等待时间。
+ * 超过就当作"查不到"直接继续下载——前置检查是 best-effort，不能因为网络慢卡住主流程。
+ */
+export const REQUIREMENTS_PROMPT_TIMEOUT_MS = 6000;
+
 /** 游戏列表缓存时间（游戏表变化很慢，一天足够） */
 export const GAME_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -56,6 +68,7 @@ export const ACTIONS = {
   SELECT_MOD: "NEXUS_BROWSER_SELECT_MOD",
   CLOSE_DETAIL: "NEXUS_BROWSER_CLOSE_DETAIL",
   SET_DETAIL: "NEXUS_BROWSER_SET_DETAIL",
+  SET_DETAIL_ERROR: "NEXUS_BROWSER_SET_DETAIL_ERROR",
   SET_FILES: "NEXUS_BROWSER_SET_FILES",
   SET_AUTO_INSTALL: "NEXUS_BROWSER_SET_AUTO_INSTALL",
   RESET: "NEXUS_BROWSER_RESET",

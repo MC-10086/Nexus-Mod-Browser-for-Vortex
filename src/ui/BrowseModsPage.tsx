@@ -22,42 +22,34 @@ import { DEFAULT_PAGE_SIZE, SORT_OPTIONS } from "../constants";
 import { describeError } from "../nexus/client";
 import { getNexusService, resetNexusService } from "../nexus/index";
 import { actions, nexusBrowserSlice } from "../state/reducer";
+import { manualRequirementIds, prefsActions } from "../state/prefs";
 import { IModSummary } from "../types";
 import { activeGameId, gameName, isPremium, nexusDomain } from "../util/game";
-import { installedNexusModIds } from "../util/mods";
+import { installedNexusModIds, installedNexusMods } from "../util/mods";
 import { gameModsUrl, modPageUrl, openExternal } from "../util/openExternal";
+import {
+  diffIgnoredMarks,
+  IRequirementRow,
+} from "../util/requirements";
+import ModDetailDialog from "./ModDetailDialog";
 import ModTile from "./ModTile";
+import RequirementsDialog, {
+  IRequirementsDecision,
+  IRequirementsDialogData,
+} from "./RequirementsDialog";
 import { chooseModFile } from "./chooseFile";
+import { notify } from "./notify";
+import {
+  buildRequirementsPromptData,
+  isFreeAccount,
+  notifyRequirementSummary,
+  startRequirementDownload,
+  startSelectedRequirementDownloads,
+} from "./requirementsPrompt";
 import { Button, Pagination, SortMenu, TabBar, TabButton } from "./primitives";
 
 export interface IBrowseModsPageProps {
   api: any;
-}
-
-let notificationSeq = 0;
-
-/**
- * 单行通知。
- * 只填 message、不填 title —— Vortex 的通知是「标题 + 正文」两行，只给正文就只占一行。
- */
-function notify(
-  api: any,
-  type: "info" | "success" | "error",
-  text: string,
-  /** 自动关闭时间（毫秒）；不传则一直保留，需要用户手动关 */
-  displayMS?: number,
-) {
-  notificationSeq += 1;
-  try {
-    api.sendNotification({
-      id: `nexus-mod-browser-${Date.now()}-${notificationSeq}`,
-      type,
-      message: text,
-      ...(displayMS !== undefined ? { displayMS } : {}),
-    });
-  } catch {
-    /* 通知失败不影响主流程 */
-  }
 }
 
 export default function BrowseModsPage(props: IBrowseModsPageProps) {
@@ -77,6 +69,21 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
   /** 下载**真的开始**之后才放进来（按钮切成 Downloading…） */
   const [busyMods, setBusyMods] = React.useState<number[]>([]);
   const scrollRef = React.useRef<any>(undefined);
+  /**
+   * 前置弹窗：undefined = 不显示。
+   * 用 Promise 桥接，让 handleDownload 保持线性流程（弹窗选择 → 继续原来的下载）。
+   */
+  const [requirements, setRequirements] = React.useState<IRequirementsDialogData | undefined>(
+    undefined,
+  );
+  const requirementsResolveRef = React.useRef<
+    ((decision: IRequirementsDecision) => void) | undefined
+  >(undefined);
+  /**
+   * 正在查前置/等用户在弹窗里做选择的 MOD。
+   * 防止免费账号在弹窗还没出来时重复点 Download，把 Promise 桥接覆盖掉。
+   */
+  const requirementsInFlightRef = React.useRef<number[]>([]);
 
   // 订阅 store：只有我们的切片引用变了才重渲染
   React.useEffect(() => {
@@ -89,6 +96,15 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
     });
     return unsubscribe;
   }, [api]);
+
+  // 页面卸载时如果前置弹窗还开着，按取消收尾，避免 handleDownload 永远挂着
+  React.useEffect(() => {
+    return () => {
+      const resolve = requirementsResolveRef.current;
+      requirementsResolveRef.current = undefined;
+      resolve?.({ kind: "cancel", selected: [], ignored: [] });
+    };
+  }, []);
 
   const slice = sliceRef.current;
   const state = api.getState();
@@ -139,6 +155,37 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
     };
   }, [slice.loading, slice.domain, slice.query, slice.sort, slice.page, api]);
 
+  // 详情：选中 mod 后拉一次详情（命中 NexusService 的 5 分钟缓存，重开不再发请求）
+  React.useEffect(() => {
+    if (slice.selectedModId === undefined || !slice.detailLoading) {
+      return;
+    }
+    if (slice.domain === undefined) {
+      return;
+    }
+
+    const modId = slice.selectedModId;
+    const targetDomain = slice.domain;
+    let cancelled = false;
+
+    getNexusService(api)
+      .modDetail(targetDomain, modId)
+      .then((detail) => {
+        if (!cancelled) {
+          api.store.dispatch(actions.setDetail(detail));
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          api.store.dispatch(actions.setDetailError(describeError(err)));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [slice.selectedModId, slice.detailLoading, slice.domain, api]);
+
   const totalPages = Math.max(1, Math.ceil(slice.totalCount / DEFAULT_PAGE_SIZE));
 
   // 翻页后回到顶部（与官方 Page 的行为一致）
@@ -159,6 +206,64 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
     api.store.dispatch(actions.setPage(slice.page));
   };
 
+  /**
+   * 打开详情弹窗（唯一入口）。
+   * 特意做成一个独立函数：以后要换触发方式（点封面 / 双击 / 右键菜单），
+   * 只改调用处，弹窗组件和状态层都不用动。
+   */
+  const openDetail = (mod: IModSummary) => {
+    api.store.dispatch(actions.selectMod(mod.modId));
+  };
+
+  /** 详情加载失败后重试：重新 SELECT_MOD 会把 detailLoading 置位，effect 自动重跑 */
+  const retryDetail = () => {
+    if (slice.selectedModId !== undefined) {
+      api.store.dispatch(actions.selectMod(slice.selectedModId));
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // 前置弹窗：Promise 桥接 + 单行动作
+  // ---------------------------------------------------------------------------
+
+  const askRequirements = (data: IRequirementsDialogData): Promise<IRequirementsDecision> => {
+    return new Promise<IRequirementsDecision>((resolve) => {
+      requirementsResolveRef.current = resolve;
+      setRequirements(data);
+    });
+  };
+
+  const finishRequirements = (decision: IRequirementsDecision) => {
+    const resolve = requirementsResolveRef.current;
+    requirementsResolveRef.current = undefined;
+    setRequirements(undefined);
+    resolve?.(decision);
+  };
+
+  /** 弹窗里某一行的 Download：立刻开始，不等主 MOD 流程 */
+  const handleRequirementDownloadOne = async (row: IRequirementRow): Promise<boolean> => {
+    const current = api.getState();
+    const internalGameId = activeGameId(current);
+    const currentDomain = nexusDomain(current, internalGameId);
+
+    if (currentDomain === undefined || internalGameId === undefined) {
+      return false;
+    }
+
+    // 用户手动标记过，但现在主动点 Download → 撤销标记，重新走插件下载
+    if (row.kind === "manual") {
+      api.store.dispatch(prefsActions.unmarkManualRequirement(currentDomain, row.modId));
+    }
+
+    return startRequirementDownload(api, { domain: currentDomain, internalGameId }, row);
+  };
+
+  const handleRequirementViewPage = (row: IRequirementRow) => {
+    if (row.url !== undefined) {
+      openExternal(row.url);
+    }
+  };
+
   const handleDownload = async (mod: IModSummary) => {
     const current = api.getState();
     const internalGameId = activeGameId(current);
@@ -169,7 +274,13 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
       return;
     }
 
+    // 前置查询/弹窗进行中：同一 MOD 不允许再开一条流程（会覆盖 Promise 桥接）
+    if (requirementsInFlightRef.current.indexOf(mod.modId) !== -1) {
+      return;
+    }
+
     const premium = isPremium(current);
+    const freeAccount = isFreeAccount(current);
 
     // Premium 走宿主 API，重复 emit 会排两次队，所以这里仍然防重。
     // 免费账号走浏览器：重复点击只是再打开一次页面，必须允许（用户常常关掉网页重来）。
@@ -189,6 +300,56 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
     }
 
     try {
+      // ---- 前置检查（best-effort）----------------------------------------
+      // 查询失败 / 超时 / 限流一律返回 undefined → 不弹窗，直接走原来的下载流程。
+      let requirementsToDownload: IRequirementRow[] = [];
+      requirementsInFlightRef.current = requirementsInFlightRef.current.concat([mod.modId]);
+      try {
+        const promptData = await buildRequirementsPromptData(api, {
+          domain: currentDomain,
+          internalGameId,
+          modId: mod.modId,
+          modName: mod.name,
+          installed: installedNexusMods(current, internalGameId),
+          manual: manualRequirementIds(current, currentDomain),
+          freeAccount,
+        });
+
+        if (promptData !== undefined) {
+          const decision = await askRequirements(promptData);
+
+          if (decision.kind === "cancel") {
+            return;
+          }
+
+          // "不再提醒"是显式勾选：不管是 Download 还是 Skip，都按最终状态持久化差集
+          const originalIgnored = promptData.rows
+            .filter((row) => row.kind === "manual")
+            .map((row) => row.modId);
+          const { mark, unmark } = diffIgnoredMarks(originalIgnored, decision.ignored);
+          for (const id of mark) {
+            api.store.dispatch(prefsActions.markManualRequirement(currentDomain, id));
+          }
+          for (const id of unmark) {
+            api.store.dispatch(prefsActions.unmarkManualRequirement(currentDomain, id));
+          }
+
+          if (decision.kind === "download") {
+            const wanted = new Set(decision.selected);
+            requirementsToDownload = promptData.rows.filter(
+              (row) =>
+                (row.kind === "missing" || row.kind === "manual") &&
+                wanted.has(row.modId),
+            );
+          }
+          // kind === "skip"：不下载前置，但"不再提醒"的勾选照常生效
+        }
+      } finally {
+        requirementsInFlightRef.current = requirementsInFlightRef.current.filter(
+          (id) => id !== mod.modId,
+        );
+      }
+
       const files = await getNexusService(api).modFiles(currentDomain, mod.modId);
       if (files.length === 0) {
         notify(api, "error", "无法下载：该 MOD 没有可下载的文件。");
@@ -200,6 +361,15 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
       if (file === undefined) {
         // 用户在选文件弹窗里点了取消 —— 什么都不做
         return;
+      }
+
+      // 主文件已选定 → 先把勾选的前置交给下载管道（后台，不阻塞主 MOD）
+      if (requirementsToDownload.length > 0) {
+        void startSelectedRequirementDownloads(
+          api,
+          { domain: currentDomain, internalGameId, freeAccount },
+          requirementsToDownload,
+        ).then((result) => notifyRequirementSummary(api, { freeAccount }, result));
       }
 
       const outcome = await downloadForUser(
@@ -358,6 +528,7 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
             }}
             onOpen={() => openExternal(modPageUrl(domain, mod.modId))}
             onViewPage={() => openExternal(modPageUrl(domain, mod.modId))}
+            onDetails={() => openDetail(mod)}
           />
         ))}
       </div>
@@ -430,6 +601,31 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
             : null}
         </div>
       </MainPage.Body>
+
+      {/* 详情弹窗：.nxm-modal 是 position:fixed，放在 Body 外面不会被滚动容器裁切 */}
+      {slice.selectedModId !== undefined
+        ? (
+          <ModDetailDialog
+            summary={slice.results.find((item) => item.modId === slice.selectedModId)}
+            detail={slice.detail}
+            error={slice.detailError}
+            onClose={() => api.store.dispatch(actions.closeDetail())}
+            onRetry={retryDetail}
+          />
+        )
+        : null}
+
+      {/* 前置弹窗：由 Download 流程通过 Promise 打开，关闭后才继续下载 */}
+      {requirements !== undefined
+        ? (
+          <RequirementsDialog
+            data={requirements}
+            onDecision={finishRequirements}
+            onDownloadOne={handleRequirementDownloadOne}
+            onViewPage={handleRequirementViewPage}
+          />
+        )
+        : null}
     </MainPage>
   );
 }

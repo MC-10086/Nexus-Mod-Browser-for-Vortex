@@ -55,6 +55,8 @@ query ModDetail($modId: ID!, $gameId: ID!) {
     createdAt
     updatedAt
     pictureUrl
+    thumbnailLargeUrl
+    thumbnailUrl
     game { id domainName }
     uploader { name }
     viewerDownloaded
@@ -77,6 +79,40 @@ query ModFiles($modId: ID!, $gameId: ID!) {
     sizeInBytes
     uri
     date
+  }
+}`;
+
+/**
+ * Q3.5 前置（依赖）清单
+ * ---------------------------------------------------------------------------
+ * - `nexusRequirements(count: 50)`：N 网作者登记的必需 MOD。实测 count 支持到 50，
+ *   默认 10 会截断（kryptopyr's Patch Hub 有 16 条）。
+ * - `dlcRequirements`：需要的 DLC / 资料片，无法检测，只能提示。
+ * - `legacyModRequirementsEnabled`：false = 新模型（文件级依赖），但公开 API 仍只暴露
+ *   mod 级清单；**不要加 skipDisabledRequirements: true**，那会把 SkyUI 的 SKSE 过滤掉。
+ */
+export const Q_MOD_REQUIREMENTS = `
+query ModRequirements($modId: ID!, $gameId: ID!) {
+  mod(modId: $modId, gameId: $gameId) {
+    modId
+    legacyModRequirementsEnabled
+    modRequirements {
+      nexusRequirements(count: 50) {
+        totalCount
+        nodes {
+          gameId
+          modId
+          modName
+          notes
+          url
+          externalRequirement
+        }
+      }
+      dlcRequirements {
+        notes
+        gameExpansion { id name }
+      }
+    }
   }
 }`;
 

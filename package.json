@@ -1,6 +1,6 @@
 {
   "name": "vortex-nexus-mod-browser",
-  "version": "0.6.3",
+  "version": "1.0.0",
   "private": true,
   "description": "Vortex extension: browse and download Nexus Mods from inside the mod manager",
   "scripts": {

@@ -16,8 +16,22 @@ const path = require("path");
 const Module = require("module");
 
 // ---------------------------------------------------------------------------
-// 1) 宿主模块 → stub
+// 1) 宿主模块 → stub；并把 https 拨到"永不应答"，避免冒烟测试真的访问 Nexus
 // ---------------------------------------------------------------------------
+const https = require("https");
+const { EventEmitter } = require("events");
+
+let httpCalls = 0;
+https.request = function fakeRequest() {
+  httpCalls += 1;
+  const req = new EventEmitter();
+  req.write = () => {};
+  req.end = () => {};
+  req.setTimeout = () => {};
+  req.destroy = () => {};
+  return req;
+};
+
 const reactStubPath = path.join(__dirname, "stubs", "react.js");
 const vortexApiStubPath = path.join(__dirname, "stubs", "vortex-api.js");
 
@@ -76,12 +90,16 @@ const context = {
 
 assert.strictEqual(init(context), true, "init 应返回 true");
 
-assert.strictEqual(calls.reducers.length, 1, "应注册 1 个 reducer");
-assert.deepStrictEqual(
-  calls.reducers[0].pathParts,
-  ["session", "nexusBrowser"],
-  "reducer 路径必须是 session.nexusBrowser",
+assert.strictEqual(calls.reducers.length, 2, "应注册 2 个 reducer（会话 + 持久化偏好）");
+const sliceReducer = calls.reducers.find(
+  (item) => item.pathParts.join(".") === "session.nexusBrowser",
 );
+const prefsReducer = calls.reducers.find(
+  (item) => item.pathParts.join(".") === "persistent.nexusBrowserPrefs",
+);
+assert.ok(sliceReducer, "reducer 路径必须是 session.nexusBrowser");
+assert.ok(prefsReducer, "应注册 persistent.nexusBrowserPrefs（手动安装标记）");
+assert.ok(prefsReducer.spec.defaults.manualRequirements !== undefined, "偏好 reducer 默认值应含 manualRequirements");
 
 assert.strictEqual(calls.pages.length, 1, "应注册 1 个主页面");
 const page = calls.pages[0];
@@ -137,7 +155,7 @@ const MODS = [
   },
 ];
 
-const DEFAULTS = calls.reducers[0].spec.defaults;
+const DEFAULTS = sliceReducer.spec.defaults;
 
 function makeState(slice, extra) {
   return {
@@ -339,8 +357,336 @@ function render(state) {
   assert.strictEqual(setGame.payload.domain, "skyrimspecialedition");
 }
 
+// ---------------------------------------------------------------------------
+// 详情弹窗：入口 / 内容 / 三种数据状态 / 空简介
+// ---------------------------------------------------------------------------
+const DETAIL = {
+  modId: MODS[0].modId,
+  name: MODS[0].name,
+  summary: MODS[0].summary,
+  description:
+    "[b]Bold text[/b] and [url=https://www.nexusmods.com/skyrimspecialedition]a link[/url]\n<br />" +
+    "[list]\n<br />[*]First item[/*]\n<br />[*]Second item[/*]\n<br />[/list]",
+  pictureUrl: "https://staticdelivery.nexusmods.com/main.png",
+  thumbnailLargeUrl: "https://images.nexusmods.com/large.png",
+  author: "Stracker",
+  version: "1.24",
+  downloads: 1284000,
+  endorsements: 21800,
+  uploader: { name: "Stracker" },
+};
+
+// 场景 E：入口按钮 → dispatch SELECT_MOD（入口本身可随时换掉，弹窗只看 state）
+{
+  const slice = {
+    ...DEFAULTS,
+    domain: "skyrimspecialedition",
+    loading: false,
+    results: MODS,
+    totalCount: 131,
+  };
+  const { tree, api } = render(makeState(slice));
+  const detailsButton = findAll(
+    tree,
+    (el) => el.type === "button" && textOf(el).trim() === "Details",
+  )[0];
+  assert.ok(detailsButton, "卡片底部应有 Details 按钮");
+  assert.strictEqual(typeof detailsButton.props.onClick, "function", "Details 按钮应可点击");
+  assert.strictEqual(detailsButton.props.disabled, undefined, "Details 不应被禁用");
+
+  detailsButton.props.onClick();
+  const action = api.dispatched.find((item) => item.type === "NEXUS_BROWSER_SELECT_MOD");
+  assert.ok(action, "点 Details 应 dispatch SELECT_MOD");
+  assert.strictEqual(action.payload.modId, MODS[0].modId);
+}
+
+// 场景 F：详情已就绪 → 主图 + 标题 + 元信息 + BBCode 正文 + 三种关闭方式
+{
+  const slice = {
+    ...DEFAULTS,
+    domain: "skyrimspecialedition",
+    loading: false,
+    results: MODS,
+    totalCount: 131,
+    selectedModId: MODS[0].modId,
+    detail: DETAIL,
+  };
+  const { tree, text } = render(makeState(slice));
+
+  const dialog = findAll(tree, (el) => el.props && el.props["data-testid"] === "mod-detail");
+  assert.strictEqual(dialog.length, 1, "应渲染详情弹窗");
+  assert.ok(hasClass(dialog[0], "nxm-modal"), "弹窗外壳应使用宿主 nxm-modal 类");
+  assert.ok(hasClass(dialog[0], "nxm-modal-xl"), "详情弹窗应为 -xl 尺寸");
+
+  const overlay = findAll(tree, (el) => hasClass(el, "nxm-modal-overlay"))[0];
+  assert.ok(overlay, "应有遮罩层");
+  assert.strictEqual(typeof overlay.props.onClick, "function", "点遮罩应能关闭");
+
+  const closeButton = findAll(
+    tree,
+    (el) => el.type === "button" && hasClass(el, "nxm-modal-close"),
+  )[0];
+  assert.ok(closeButton, "右上角应有宿主样式的关闭按钮");
+  assert.strictEqual(closeButton.props["aria-label"], "Close", "关闭按钮用英文 aria-label");
+  assert.strictEqual(typeof closeButton.props.onClick, "function", "点 × 应能关闭");
+
+  const hero = findAll(
+    tree,
+    (el) => el.type === "img" && el.props && el.props.src === DETAIL.pictureUrl,
+  );
+  assert.strictEqual(hero.length, 1, "应显示主图（第一候选）");
+
+  assert.ok(text.indexOf(MODS[0].name) !== -1, "应显示标题");
+  assert.ok(text.indexOf("1.28M downloads") !== -1, "应显示下载量元信息");
+  assert.ok(text.indexOf("v1.24") !== -1, "应显示版本");
+
+  const body = findAll(
+    tree,
+    (el) => el.props && el.props["data-testid"] === "mod-detail-body",
+  )[0];
+  assert.ok(body, "简介应渲染在正文容器里");
+
+  // 排版补丁：必须是"宿主类作用域"，不能新造类名（tailwind 是按需编译的）
+  const styleNode = findAll(tree, (el) => el.type === "style")[0];
+  assert.ok(styleNode, "应注入 BBCode 排版补丁 <style>");
+  const cssText = textOf(styleNode);
+  assert.ok(
+    cssText.indexOf(".nxm-modal .nxm-modal-panel a") !== -1,
+    "排版补丁应以宿主 .nxm-modal 作用域生效",
+  );
+  assert.strictEqual(
+    cssText.indexOf("nxm-mod-browser-detail"),
+    -1,
+    "不应自造类名（只用宿主类 + 内联样式）",
+  );
+  assert.ok(
+    findAll(tree, (el) => el.type === "strong").length >= 1,
+    "BBCode 粗体应被渲染成 <strong>",
+  );
+  const link = findAll(tree, (el) => el.type === "a")[0];
+  assert.ok(link, "BBCode 链接应被渲染成 <a>");
+  assert.strictEqual(link.props.href, "https://www.nexusmods.com/skyrimspecialedition");
+  assert.ok(findAll(tree, (el) => el.type === "ul").length >= 1, "BBCode 列表应被渲染成 <ul>");
+  assert.ok(findAll(tree, (el) => el.type === "li").length >= 2, "列表项应被渲染成 <li>");
+  assert.strictEqual(
+    findAll(tree, (el) => el.props && el.props["data-testid"] === "mod-detail-loading").length,
+    0,
+    "详情就绪后不应再显示骨架",
+  );
+}
+
+// 场景 G：详情加载中 → 骨架，而不是空弹窗
+{
+  const slice = {
+    ...DEFAULTS,
+    domain: "skyrimspecialedition",
+    loading: false,
+    results: MODS,
+    totalCount: 131,
+    selectedModId: MODS[0].modId,
+    detailLoading: true,
+  };
+  const { tree, text } = render(makeState(slice));
+  assert.strictEqual(
+    findAll(tree, (el) => el.props && el.props["data-testid"] === "mod-detail-loading").length,
+    1,
+    "加载中应显示骨架",
+  );
+  assert.ok(text.indexOf("该 MOD 未提供简介") === -1, "加载中不能先闪『未提供简介』");
+}
+
+// 场景 H：详情加载失败 → 错误文案 + Retry
+{
+  const slice = {
+    ...DEFAULTS,
+    domain: "skyrimspecialedition",
+    loading: false,
+    results: MODS,
+    totalCount: 131,
+    selectedModId: MODS[0].modId,
+    detailLoading: false,
+    detailError: "请求 Nexus API 超时，请检查网络后重试。",
+  };
+  const { tree, text } = render(makeState(slice));
+  assert.ok(text.indexOf("超时") !== -1, "应显示详情错误文案");
+  const retry = findAll(tree, (el) => el.type === "button" && textOf(el).trim() === "Retry")[0];
+  assert.ok(retry, "应提供 Retry 按钮");
+  assert.strictEqual(typeof retry.props.onClick, "function", "Retry 应可点击");
+}
+
+// 场景 I：简介为空的 MOD → 显示兜底文案，不出现空白正文
+{
+  const slice = {
+    ...DEFAULTS,
+    domain: "skyrimspecialedition",
+    loading: false,
+    results: MODS,
+    totalCount: 131,
+    selectedModId: MODS[0].modId,
+    detail: { ...DETAIL, description: "", summary: "" },
+  };
+  const { tree, text } = render(makeState(slice));
+  assert.ok(text.indexOf("该 MOD 未提供简介") !== -1, "空简介应显示兜底文案");
+  const body = findAll(
+    tree,
+    (el) => el.props && el.props["data-testid"] === "mod-detail-body",
+  )[0];
+  assert.ok(body, "兜底文案也应放在正文容器里");
+}
+
+// ---------------------------------------------------------------------------
+// 前置弹窗：行模型 / 每行按钮 / 勾选 / 底部操作
+// ---------------------------------------------------------------------------
+{
+  const reqUtil = require("../dist/util/requirements");
+  const RequirementsDialog = require("../dist/ui/RequirementsDialog.js").default;
+
+  const info = {
+    gameNumericId: "1704",
+    totalCount: 6,
+    nexus: [
+      { gameId: "1704", modId: "30379", modName: "SKSE", notes: "需要 1.6.640+", externalRequirement: false },
+      { gameId: "1704", modId: "266", modName: "USSEP", externalRequirement: false },
+      { gameId: "1704", modId: "999", modName: "Manual Mod", externalRequirement: false },
+      { gameId: "1704", modId: "123", modName: "Installed Mod", externalRequirement: false },
+      { gameId: "1704", modId: "0", modName: "VC++", url: "https://example.invalid/vc", externalRequirement: true },
+      { gameId: "9999", modId: "555", modName: "Cross Game", externalRequirement: false },
+    ],
+    dlc: [{ gameExpansion: { name: "Saints &amp; Seducers" }, notes: "" }],
+  };
+
+  const rows = reqUtil.buildRequirementRows({
+    info,
+    installed: new Map([[123, { version: "1.2.3" }]]),
+    manual: [999],
+    domain: "skyrimspecialedition",
+    selfModId: 100,
+  });
+
+  const decisions = [];
+  const downloads = [];
+  const views = [];
+
+  React.__resetHooks();
+  const tree = RequirementsDialog({
+    data: {
+      modName: "SkyUI",
+      rows,
+      dlc: reqUtil.buildDlcRows(info),
+      freeAccount: true,
+      defaultSelected: reqUtil.defaultSelectedModIds(rows),
+    },
+    onDecision: (decision) => decisions.push(decision),
+    onDownloadOne: async (row) => {
+      downloads.push(row.modId);
+      return true;
+    },
+    onViewPage: (row) => views.push(row.modId),
+  });
+  React.__runCleanups();
+
+  assert.strictEqual(
+    findAll(tree, (el) => el.props && el.props["data-testid"] === "requirements-dialog").length,
+    1,
+    "应渲染前置弹窗",
+  );
+
+  const rowNodes = findAll(tree, (el) => el.props && el.props["data-testid"] === "requirement-row");
+  assert.strictEqual(rowNodes.length, 6, "应渲染 6 行前置");
+  assert.deepStrictEqual(
+    rowNodes.map((el) => el.props["data-kind"]),
+    ["missing", "missing", "manual", "installed", "external", "otherGame"],
+    "行顺序：未安装 → 手动 → 已安装 → 站外 → 其他游戏",
+  );
+
+  // 每行都有 Download / View page
+  const downloadButtons = findAll(
+    tree,
+    (el) => el.type === "button" && textOf(el).trim() === "Download",
+  );
+  assert.strictEqual(downloadButtons.length, 6, "每行都应有 Download 按钮");
+  assert.deepStrictEqual(
+    downloadButtons.map((btn) => btn.props.disabled === true),
+    [false, false, true, true, true, true],
+    "不再提醒 / 已安装 / 站外 / 其他游戏的 Download 应置灰",
+  );
+
+  const viewButtons = findAll(
+    tree,
+    (el) => el.type === "button" && textOf(el).trim() === "View page",
+  );
+  assert.strictEqual(viewButtons.length, 6, "每行都应有 View page 按钮");
+  assert.strictEqual(
+    viewButtons[5].props.disabled,
+    true,
+    "没有 URL 的其他游戏前置 View page 应置灰",
+  );
+
+  // 2 个未安装行的下载勾选 + 3 个"不再提醒"（2 未安装 + 1 忽略）+ 1 个全选 = 6
+  const checkboxes = findAll(tree, (el) => el.props && el.props.role === "checkbox");
+  assert.strictEqual(checkboxes.length, 6, "下载勾选 / 不再提醒 / 全选");
+
+  const boxByLabel = (label) =>
+    checkboxes.find((box) => box.props["aria-label"] === label);
+  assert.strictEqual(boxByLabel("SKSE").props["aria-checked"], true, "未安装默认勾选");
+  assert.strictEqual(boxByLabel("USSEP").props["aria-checked"], true, "未安装默认勾选");
+  assert.strictEqual(
+    boxByLabel("Manual Mod"),
+    undefined,
+    "不再提醒的行视为已安装，不应有下载勾选",
+  );
+  assert.strictEqual(
+    boxByLabel("不再提醒 Manual Mod").props["aria-checked"],
+    true,
+    "手动标记的行默认勾上『不再提醒』",
+  );
+  assert.strictEqual(boxByLabel("不再提醒 SKSE").props["aria-checked"], false);
+  assert.strictEqual(boxByLabel("Select all").props["aria-checked"], true);
+
+  const text = textOf(tree).replace(/\s+/g, " ");
+  assert.ok(text.indexOf("还需要以下 DLC") !== -1, "应提示 DLC");
+  assert.ok(text.indexOf("Saints & Seducers") !== -1, "DLC 名应解码显示");
+  assert.ok(text.indexOf("当前是免费账号") !== -1, "免费账号应提示会开浏览器");
+  assert.ok(text.indexOf("Mod manager download") !== -1, "免费提示应使用 N 网按钮的正确文案");
+  assert.ok(text.indexOf("不再提醒") !== -1, "应有『不再提醒』选项");
+  assert.ok(text.indexOf("Download selected (2)") !== -1, "主按钮应显示已选数量");
+
+  // 弹窗底部不再有 Cancel（和右上角 × 重复）
+  assert.strictEqual(
+    findAll(tree, (el) => el.type === "button" && textOf(el).trim() === "Cancel").length,
+    0,
+    "底部不应再有 Cancel 按钮",
+  );
+
+  // 点主按钮：返回默认勾选的 2 项 + 已忽略的 999
+  const primary = findAll(
+    tree,
+    (el) => el.type === "button" && textOf(el).trim() === "Download selected (2)",
+  )[0];
+  primary.props.onClick();
+  assert.strictEqual(decisions[0].kind, "download");
+  assert.deepStrictEqual(decisions[0].selected, [30379, 266]);
+  assert.deepStrictEqual(decisions[0].ignored, [999]);
+
+  // 单行 Download 立即触发
+  downloadButtons[0].props.onClick();
+  assert.deepStrictEqual(downloads, [30379], "单行 Download 应立即触发");
+
+  // View page 打开链接
+  viewButtons[0].props.onClick();
+  assert.deepStrictEqual(views, [30379], "View page 应打开对应页面");
+
+  // 右上角 × = Cancel
+  const closeButton = findAll(
+    tree,
+    (el) => el.type === "button" && hasClass(el, "nxm-modal-close"),
+  )[0];
+  closeButton.props.onClick();
+  assert.strictEqual(decisions[decisions.length - 1].kind, "cancel");
+}
+
 console.log("冒烟测试通过：");
-console.log(`  reducer 路径 : ${calls.reducers[0].pathParts.join(".")}`);
+console.log(`  reducer 路径 : ${sliceReducer ? sliceReducer.pathParts.join(".") : "?"}`);
 console.log(`  页面         : ${page.title}（id=${page.options.id}, group=${page.options.group}）`);
 console.log("  导航图标     : 镜像搜索图标（mdi path）");
-console.log("  渲染场景     : 有数据 / 加载中 / 错误 / 切换游戏");
+console.log("  渲染场景     : 有数据 / 加载中 / 错误 / 切换游戏 / 详情就绪 / 详情加载 / 详情错误 / 空简介 / 前置弹窗");

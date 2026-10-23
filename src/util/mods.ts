@@ -15,24 +15,35 @@
  * 所以要把 type === "collection" 的条目排除掉，避免"装了合集以为装了原 mod"。
  */
 
-/** 从整棵 state 里取出某游戏已安装的 Nexus mod id 集合 */
-export function installedNexusModIds(state: any, gameId: string | undefined): number[] {
+/** 已安装的 Nexus MOD（modId → 本地版本） */
+export interface IInstalledNexusMod {
+  /** Vortex 记录的版本（attributes.version，可能是 "1.6.353" 这种非 semver） */
+  version?: string;
+}
+
+/**
+ * 已安装 Nexus MOD 的明细：modId → { version }。
+ * 前置弹窗需要"本地版本"，所以除了 id 还要版本；合集同样排除。
+ */
+export function installedNexusMods(
+  state: any,
+  gameId: string | undefined,
+): Map<number, IInstalledNexusMod> {
+  const result = new Map<number, IInstalledNexusMod>();
   if (!gameId) {
-    return [];
+    return result;
   }
 
   const mods = state?.persistent?.mods?.[gameId];
   if (mods === undefined || mods === null) {
-    return [];
+    return result;
   }
 
-  const ids: number[] = [];
   for (const key of Object.keys(mods)) {
     const mod = mods[key];
     if (mod === undefined || mod === null) {
       continue;
     }
-    // 合集不是"这个 MOD 装好了"，跳过
     if (mod.type === "collection") {
       continue;
     }
@@ -41,12 +52,23 @@ export function installedNexusModIds(state: any, gameId: string | undefined): nu
       continue;
     }
     const nexusId = attributes.modId;
-    if (typeof nexusId === "number" && isFinite(nexusId)) {
-      ids.push(nexusId);
+    if (typeof nexusId !== "number" || !isFinite(nexusId)) {
+      continue;
+    }
+    const version = typeof attributes.version === "string" ? attributes.version : undefined;
+    // 同一个 modId 装了多份时保留有版本的那一条
+    const existing = result.get(nexusId);
+    if (existing === undefined || (existing.version === undefined && version !== undefined)) {
+      result.set(nexusId, { version });
     }
   }
 
-  return ids;
+  return result;
+}
+
+/** 从整棵 state 里取出某游戏已安装的 Nexus mod id 集合 */
+export function installedNexusModIds(state: any, gameId: string | undefined): number[] {
+  return Array.from(installedNexusMods(state, gameId).keys());
 }
 
 /** 便捷版：某个 Nexus mod 是否已安装 */

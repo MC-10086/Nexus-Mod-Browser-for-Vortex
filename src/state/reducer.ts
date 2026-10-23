@@ -24,6 +24,7 @@ export const DEFAULTS: INexusBrowserState = {
   error: undefined,
   selectedModId: undefined,
   detail: undefined,
+  detailError: undefined,
   files: [],
   detailLoading: false,
   autoInstall: true,
@@ -98,6 +99,7 @@ export const reducerSpec = {
       ...state,
       selectedModId: payload.modId,
       detail: undefined,
+      detailError: undefined,
       files: [],
       detailLoading: true,
     }),
@@ -106,6 +108,7 @@ export const reducerSpec = {
       ...state,
       selectedModId: undefined,
       detail: undefined,
+      detailError: undefined,
       files: [],
       detailLoading: false,
     }),
@@ -113,6 +116,14 @@ export const reducerSpec = {
     [ACTIONS.SET_DETAIL]: (state: INexusBrowserState, payload: { detail: any }) => ({
       ...state,
       detail: payload.detail,
+      detailError: undefined,
+      detailLoading: false,
+    }),
+
+    [ACTIONS.SET_DETAIL_ERROR]: (state: INexusBrowserState, payload: { message: string }) => ({
+      ...state,
+      detail: undefined,
+      detailError: payload.message,
       detailLoading: false,
     }),
 
@@ -162,6 +173,10 @@ export const actions = {
   selectMod: (modId: number) => ({ type: ACTIONS.SELECT_MOD, payload: { modId } }),
   closeDetail: () => ({ type: ACTIONS.CLOSE_DETAIL, payload: {} }),
   setDetail: (detail: any) => ({ type: ACTIONS.SET_DETAIL, payload: { detail } }),
+  setDetailError: (message: string) => ({
+    type: ACTIONS.SET_DETAIL_ERROR,
+    payload: { message },
+  }),
   setFiles: (files: any[]) => ({ type: ACTIONS.SET_FILES, payload: { files } }),
   setAutoInstall: (autoInstall: boolean) => ({
     type: ACTIONS.SET_AUTO_INSTALL,

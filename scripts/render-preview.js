@@ -34,50 +34,141 @@ Module._resolveFilename = function (request, ...rest) {
 
 const React = require(reactStub);
 const page = require("../dist/ui/BrowseModsPage.js").default;
+const RequirementsDialog = require("../dist/ui/RequirementsDialog.js").default;
+const reqUtil = require("../dist/util/requirements.js");
 const { DEFAULTS } = require("../dist/state/reducer.js");
-const { generate } = require("./preview-data.js");
+const { generate, detailOf } = require("./preview-data.js");
 
 // ---------------------------------------------------------------------------
-// 2) 构造一个"已经加载好数据"的假 store，让页面直接渲染列表
+// 2) 构造"已经加载好数据"的假 store；列表页与详情弹窗各渲染一份
 // ---------------------------------------------------------------------------
 const GAME_ID = "monsterhunterworld";
 const GAME_DOMAIN = "monsterhunterworld";
+const RESULTS = generate(6);
 
-const previewState = {
-  settings: { profiles: { activeProfileId: "p1" } },
-  persistent: {
-    profiles: { p1: { gameId: GAME_ID } },
-    // 让预览里能看到「已安装」徽标（modId 1000 = 生成的第一个 mod）
-    mods: { [GAME_ID]: { "installed-preview": { attributes: { modId: 1000, source: "nexus" } } } },
-  },
-  confidential: { account: { nexus: { APIKey: "preview-key" } } },
-  session: {
-    gameMode: {
-      known: [
-        { id: GAME_ID, name: "Monster Hunter: World", details: { nexusPageId: GAME_DOMAIN } },
-      ],
+function makeState(slice) {
+  return {
+    settings: { profiles: { activeProfileId: "p1" } },
+    persistent: {
+      profiles: { p1: { gameId: GAME_ID } },
+      // 让预览里能看到「已安装」徽标（modId 1000 = 生成的第一个 mod）
+      mods: { [GAME_ID]: { "installed-preview": { attributes: { modId: 1000, source: "nexus" } } } },
     },
-    nexusBrowser: {
-      ...DEFAULTS,
-      domain: GAME_DOMAIN,
-      loading: false,
-      results: generate(6),
-      totalCount: 131,
+    confidential: { account: { nexus: { APIKey: "preview-key" } } },
+    session: {
+      gameMode: {
+        known: [
+          { id: GAME_ID, name: "Monster Hunter: World", details: { nexusPageId: GAME_DOMAIN } },
+        ],
+      },
+      nexusBrowser: {
+        ...DEFAULTS,
+        domain: GAME_DOMAIN,
+        loading: false,
+        results: RESULTS,
+        totalCount: 131,
+        ...slice,
+      },
     },
-  },
+  };
+}
+
+function makeApi(state) {
+  return {
+    getState: () => state,
+    sendNotification: () => {},
+    store: {
+      getState: () => state,
+      subscribe: () => () => {},
+      dispatch: () => {},
+    },
+  };
+}
+
+function renderPage(state) {
+  React.__resetHooks();
+  const tree = page({ api: makeApi(state) });
+  React.__runCleanups();
+  return tree;
+}
+
+const listTree = renderPage(makeState({}));
+const detailTree = renderPage(
+  makeState({
+    selectedModId: RESULTS[0].modId,
+    detail: detailOf(RESULTS[0]),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// 2b) 前置弹窗（独立组件，直接喂假数据）
+// ---------------------------------------------------------------------------
+const REQUIREMENT_INFO = {
+  gameNumericId: "1704",
+  legacyModRequirementsEnabled: true,
+  totalCount: 6,
+  nexus: [
+    {
+      gameId: "1704",
+      modId: "30379",
+      modName: "Skyrim Script Extender (SKSE64)",
+      notes: "需要游戏版本 1.6.640 或更高",
+      externalRequirement: false,
+    },
+    {
+      gameId: "1704",
+      modId: "32444",
+      modName: "Address Library for SKSE Plugins",
+      externalRequirement: false,
+    },
+    {
+      gameId: "1704",
+      modId: "999",
+      modName: "PapyrusUtil SE",
+      externalRequirement: false,
+    },
+    {
+      gameId: "1704",
+      modId: "123",
+      modName: "Unofficial Skyrim Special Edition Patch",
+      externalRequirement: false,
+    },
+    {
+      gameId: "1704",
+      modId: "0",
+      modName: "Microsoft Visual C++ 2015-2022 Redistributable",
+      url: "https://example.invalid/vc",
+      externalRequirement: true,
+    },
+  ],
+  dlc: [
+    { gameExpansion: { name: "Saints &amp; Seducers" }, notes: "" },
+    { gameExpansion: { name: "Rare Curios" }, notes: "" },
+  ],
 };
 
-const fakeApi = {
-  getState: () => previewState,
-  sendNotification: () => {},
-  store: {
-    getState: () => previewState,
-    subscribe: () => () => {},
-    dispatch: () => {},
-  },
-};
+const REQUIREMENT_ROWS = reqUtil.buildRequirementRows({
+  info: REQUIREMENT_INFO,
+  installed: new Map([[123, { version: "4.3.1" }]]),
+  manual: [999],
+  domain: "skyrimspecialedition",
+  selfModId: 1,
+});
 
-const tree = page({ api: fakeApi });
+React.__resetHooks();
+const requirementsTree = RequirementsDialog({
+  data: {
+    modName: "SkyUI",
+    rows: REQUIREMENT_ROWS,
+    dlc: reqUtil.buildDlcRows(REQUIREMENT_INFO),
+    freeAccount: false,
+    defaultSelected: reqUtil.defaultSelectedModIds(REQUIREMENT_ROWS),
+  },
+  onDecision: () => undefined,
+  onDownloadOne: async () => true,
+  onViewPage: () => undefined,
+});
+React.__runCleanups();
 
 const VOID_TAGS = new Set(["img", "input", "br", "hr", "meta", "link", "path", "circle", "rect", "stop", "use"]);
 const SKIP_PROPS = new Set([
@@ -193,11 +284,12 @@ if (fs.existsSync(cssSource)) {
   console.warn("[preview] 找不到 tailwind-v4.css，预览将没有样式");
 }
 
-const html = `<!doctype html>
+function pageHtml(title, tree) {
+  return `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8" />
-<title>Nexus Mod Browser · preview</title>
+<title>${title}</title>
 <link rel="stylesheet" href="tailwind.css" />
 <style>
   html, body { margin: 0; height: 100%; }
@@ -216,6 +308,16 @@ const html = `<!doctype html>
 <div id="host">${render(tree)}</div>
 </body>
 </html>`;
+}
 
-fs.writeFileSync(path.join(outDir, "preview.html"), html, "utf8");
-console.log("[preview] 已生成 " + path.join(outDir, "preview.html"));
+const targets = [
+  ["preview.html", "Nexus Mod Browser · preview", listTree],
+  ["preview-detail.html", "Nexus Mod Browser · detail dialog", detailTree],
+  ["preview-requirements.html", "Nexus Mod Browser · requirements dialog", requirementsTree],
+];
+
+for (const [file, title, tree] of targets) {
+  const target = path.join(outDir, file);
+  fs.writeFileSync(target, pageHtml(title, tree), "utf8");
+  console.log("[preview] 已生成 " + target);
+}

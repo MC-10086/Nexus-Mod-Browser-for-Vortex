@@ -13,10 +13,12 @@
 import {
   CACHE_TTL_MS,
   GAME_CACHE_TTL_MS,
+  REQUIREMENTS_CACHE_TTL_MS,
 } from "../constants";
 import {
   IModDetail,
   IModFile,
+  IModRequirementsInfo,
   IModSummary,
   ISearchOptions,
   ISearchResult,
@@ -27,6 +29,7 @@ import {
   buildSearchVariables,
   Q_MOD_DETAIL,
   Q_MOD_FILES,
+  Q_MOD_REQUIREMENTS,
   Q_RESOLVE_GAME,
   Q_SEARCH_MODS,
 } from "./queries";
@@ -175,5 +178,51 @@ export class NexusService {
     );
 
     return files.slice().sort(compareModFiles);
+  }
+
+  /**
+   * 前置（依赖）清单。
+   * 缓存 30 分钟；失败时抛给调用方（调用方按 best-effort 处理，不能阻塞下载）。
+   */
+  public async modRequirements(
+    domain: string,
+    modId: number,
+  ): Promise<IModRequirementsInfo> {
+    const game = await this.resolveGame(domain);
+    if (game === undefined) {
+      throw new Error(`游戏 "${domain}" 在 Nexus Mods 上没有对应页面。`);
+    }
+
+    return this.load<IModRequirementsInfo>(
+      `reqs:${game.id}:${modId}`,
+      REQUIREMENTS_CACHE_TTL_MS,
+      async () => {
+        const data = await graphql<{ mod: any }>(
+          Q_MOD_REQUIREMENTS,
+          { modId: String(modId), gameId: String(game.id) },
+          this.getApiKey(),
+        );
+        const mod = data?.mod;
+        if (mod === null || mod === undefined) {
+          throw new Error(`找不到 Mod ${modId}（可能已删除或隐藏）。`);
+        }
+
+        const requirements = mod.modRequirements ?? {};
+        const nexus = (requirements.nexusRequirements?.nodes ?? []).filter(
+          (node: any) => node !== null && node !== undefined,
+        );
+        const dlc = (requirements.dlcRequirements ?? []).filter(
+          (node: any) => node !== null && node !== undefined,
+        );
+
+        return {
+          gameNumericId: String(game.id),
+          legacyModRequirementsEnabled: mod.legacyModRequirementsEnabled === true,
+          nexus,
+          dlc,
+          totalCount: requirements.nexusRequirements?.totalCount ?? nexus.length,
+        };
+      },
+    );
   }
 }

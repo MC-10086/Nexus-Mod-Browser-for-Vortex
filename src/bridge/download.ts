@@ -10,7 +10,7 @@
  *     免费账号拿不到签名直链（API 会 403），Nexus 要求用户到网页上"授权"一次。
  *     宿主原本的做法是弹 `FreeUserDLDialog`（带「跳过模组」的那个框）让用户点一下再开浏览器。
  *     我们**跳过这个弹窗**：直接打开文件页（带 `nmm=1`），用户在网页点一次
- *     "Download with Vortex"，带 key 的 nxm 链接回到 Vortex 就会新建一条下载记录；
+ *     "Mod manager download"，带 key 的 nxm 链接回到 Vortex 就会新建一条下载记录；
  *     我们监听 store 里这条记录来推进 UI。
  *
  * 关键事实（源码 IPCDownloadAdapter.ts:497）：`start-download` 的回调**只在文件落盘后**触发。
@@ -397,7 +397,7 @@ export function downloadViaBrowser(
   const startTimeoutMs = options?.startTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
   const openBrowser = options?.openBrowser ?? ((url: string) => openExternal(url));
 
-  // 直接打开文件页：网页上点 "Download with Vortex" 会把带 key 的 nxm 链接交回 Vortex
+  // 直接打开文件页：网页上点 "Mod manager download" 会把带 key 的 nxm 链接交回 Vortex
   try {
     openBrowser(modFilePageUrl(request.domain, request.modId, request.fileId));
   } catch {

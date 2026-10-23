@@ -30,6 +30,12 @@ export interface IModTileProps {
   onOpen?: () => void;
   onDownload?: () => void;
   onViewPage?: () => void;
+  /**
+   * 打开详情弹窗。
+   * 故意做成可选 prop：入口不要写死在卡片里 —— 以后想换成「点封面打开详情」，
+   * 只要不传 onDetails、把 onOpen 指到同一个 handler 即可，弹窗与状态层都不用动。
+   */
+  onDetails?: () => void;
 }
 
 function Stat(props: { icon: IconName; children: any }) {
@@ -42,7 +48,8 @@ function Stat(props: { icon: IconName; children: any }) {
 }
 
 export default function ModTile(props: IModTileProps) {
-  const { mod, category, installed, busy, onPrefetch, onOpen, onDownload, onViewPage } = props;
+  const { mod, category, installed, busy, onPrefetch, onOpen, onDownload, onViewPage, onDetails } =
+    props;
   const author = mod.uploader?.name ?? mod.author ?? "unknown";
 
   return (
@@ -142,6 +149,21 @@ export default function ModTile(props: IModTileProps) {
         >
           View page
         </Button>
+
+        {onDetails !== undefined
+          ? (
+            <Button
+              size="sm"
+              brand="neutral"
+              appearance="weak"
+              icon="details"
+              onClick={onDetails}
+              title="Show mod details"
+            >
+              Details
+            </Button>
+          )
+          : null}
 
         {installed === true
           ? (

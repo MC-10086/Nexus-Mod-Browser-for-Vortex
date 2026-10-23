@@ -23,6 +23,18 @@ export function mainFilesOf(files: IModFile[]): IModFile[] {
 }
 
 /**
+ * 文件选择弹窗的按钮文案。
+ * ---------------------------------------------------------------------------
+ * 宿主的 `showDialog` 会把 action label 过一遍 i18n（中文环境下 "Cancel" 会显示成「取消」），
+ * 而插件其他按钮统一英文。加一个零宽空格让 i18next 找不到翻译 key，从而原样显示英文；
+ * 返回的 `result.action` 也带这个后缀，所以比较时必须用这两个常量。
+ */
+export const CHOOSE_FILE_ACTION = {
+  cancel: "Cancel\u200B",
+  download: "Download\u200B",
+};
+
+/**
  * 首选文件：优先 N 网标记的 primary=1，否则取上传时间最新的那个。
  */
 export function defaultFileOf(files: IModFile[]): IModFile | undefined {
@@ -84,10 +96,18 @@ export async function chooseModFile(
         value: fallback !== undefined && file.fileId === fallback.fileId,
       })),
     },
-    [{ label: "Cancel" }, { label: "Download" }],
+    [
+      { label: CHOOSE_FILE_ACTION.cancel },
+      // Download = 默认主按钮，Cancel 保持灰色次要按钮（与前置弹窗 Skip 的风格一致）
+      { label: CHOOSE_FILE_ACTION.download, default: true },
+    ],
   );
 
-  if (result === undefined || result === null || result.action !== "Download") {
+  if (
+    result === undefined ||
+    result === null ||
+    result.action !== CHOOSE_FILE_ACTION.download
+  ) {
     return undefined;
   }
 

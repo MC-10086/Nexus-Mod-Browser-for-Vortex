@@ -12,6 +12,7 @@
 
 import { EXTENSION_ID, MIRRORED_SEARCH_ICON, PAGE_TITLE } from "./constants";
 import { reducerSpec } from "./state/reducer";
+import { prefsReducerSpec } from "./state/prefs";
 import BrowseModsPage from "./ui/BrowseModsPage";
 
 /**
@@ -56,6 +57,9 @@ function init(context: IExtensionContextLite): boolean {
   // 1) reducer 必须最先注册：后续所有注册都可能在初始化完成后立刻读 state
   //    ["session", ...] = 不持久化，符合官方对临时 UI 状态的约定
   context.registerReducer(["session", "nexusBrowser"], reducerSpec);
+
+  //    持久化偏好：用户声明"已手动安装"的前置（Vortex 重启后仍然保留）
+  context.registerReducer(["persistent", "nexusBrowserPrefs"], prefsReducerSpec);
 
   // 2) 主页面
   context.registerMainPage("search", PAGE_TITLE, BrowseModsPage, {

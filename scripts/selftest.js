@@ -179,13 +179,67 @@ test("SET_GAME 重置结果但保留排序与自动安装偏好", () => {
 
 test("CLOSE_DETAIL 清空详情但不影响结果", () => {
   const next = reduce(
-    { ...DEFAULTS, results: [{ modId: 1 }], selectedModId: 1, files: [{ fileId: 2 }], detailLoading: true },
+    {
+      ...DEFAULTS,
+      results: [{ modId: 1 }],
+      selectedModId: 1,
+      detail: { modId: 1 },
+      detailError: "boom",
+      files: [{ fileId: 2 }],
+      detailLoading: true,
+    },
     { type: "NEXUS_BROWSER_CLOSE_DETAIL", payload: {} },
   );
   assert.strictEqual(next.selectedModId, undefined);
+  assert.strictEqual(next.detail, undefined);
+  assert.strictEqual(next.detailError, undefined);
   assert.strictEqual(next.files.length, 0);
   assert.strictEqual(next.detailLoading, false);
   assert.strictEqual(next.results.length, 1);
+});
+
+test("SELECT_MOD 只重置详情相关字段，不动列表", () => {
+  const next = reduce(
+    {
+      ...DEFAULTS,
+      results: [{ modId: 1 }],
+      totalCount: 9,
+      selectedModId: 1,
+      detail: { modId: 1 },
+      detailError: "old",
+      files: [{ fileId: 2 }],
+    },
+    { type: "NEXUS_BROWSER_SELECT_MOD", payload: { modId: 42 } },
+  );
+  assert.strictEqual(next.selectedModId, 42);
+  assert.strictEqual(next.detail, undefined);
+  assert.strictEqual(next.detailError, undefined);
+  assert.strictEqual(next.files.length, 0);
+  assert.strictEqual(next.detailLoading, true);
+  assert.strictEqual(next.results.length, 1);
+  assert.strictEqual(next.totalCount, 9);
+});
+
+test("SET_DETAIL 落详情并清掉错误与 loading", () => {
+  const next = reduce(
+    { ...DEFAULTS, selectedModId: 7, detailError: "old", detailLoading: true },
+    { type: "NEXUS_BROWSER_SET_DETAIL", payload: { detail: { modId: 7, name: "X" } } },
+  );
+  assert.strictEqual(next.detail.name, "X");
+  assert.strictEqual(next.detailError, undefined);
+  assert.strictEqual(next.detailLoading, false);
+  assert.strictEqual(next.selectedModId, 7);
+});
+
+test("SET_DETAIL_ERROR 结束 loading 并保留选中（供 Retry）", () => {
+  const next = reduce(
+    { ...DEFAULTS, selectedModId: 7, detail: { modId: 7 }, detailLoading: true },
+    { type: "NEXUS_BROWSER_SET_DETAIL_ERROR", payload: { message: "网络错误" } },
+  );
+  assert.strictEqual(next.detail, undefined);
+  assert.strictEqual(next.detailError, "网络错误");
+  assert.strictEqual(next.detailLoading, false);
+  assert.strictEqual(next.selectedModId, 7);
 });
 
 test("nexusBrowserSlice 防御式取值", () => {
@@ -229,6 +283,46 @@ function defaultResponder(query, variables) {
   if (query.includes("ModDetail")) {
     assert.strictEqual(variables.gameId, "1704", "mod() 必须传数字 gameId");
     return { status: 200, body: { data: { mod: { ...MOD_A, description: "[b]desc[/b]" } } } };
+  }
+  if (query.includes("ModRequirements")) {
+    assert.strictEqual(variables.gameId, "1704", "mod() 必须传数字 gameId");
+    return {
+      status: 200,
+      body: {
+        data: {
+          mod: {
+            modId: 100,
+            legacyModRequirementsEnabled: true,
+            modRequirements: {
+              nexusRequirements: {
+                totalCount: 2,
+                nodes: [
+                  {
+                    gameId: "1704",
+                    modId: "30379",
+                    modName: "SKSE &amp; Tools",
+                    notes: "需要 1.6.640+",
+                    url: "",
+                    externalRequirement: false,
+                  },
+                  {
+                    gameId: "1704",
+                    modId: "0",
+                    modName: "VC++",
+                    notes: "",
+                    url: "https://example.invalid/vc",
+                    externalRequirement: true,
+                  },
+                ],
+              },
+              dlcRequirements: [
+                { gameExpansion: { id: "73,1704", name: "Saints &amp; Seducers" }, notes: "" },
+              ],
+            },
+          },
+        },
+      },
+    };
   }
   if (query.includes("ModFiles")) {
     return { status: 200, body: { data: { modFiles: FILES } } };
@@ -299,6 +393,24 @@ async function main() {
     const service = new NexusService(() => undefined);
     const files = await service.modFiles("skyrimspecialedition", 100);
     assert.deepStrictEqual(files.map((f) => f.fileId), [1, 3, 2]);
+  });
+
+  await testAsync("modRequirements 解析 nexus/dlc，第二次命中缓存", async () => {
+    responder = defaultResponder;
+    const service = new NexusService(() => undefined);
+    const before = requestCount;
+    const info = await service.modRequirements("skyrimspecialedition", 100);
+
+    assert.strictEqual(info.gameNumericId, "1704");
+    assert.strictEqual(info.legacyModRequirementsEnabled, true);
+    assert.strictEqual(info.nexus.length, 2);
+    assert.strictEqual(info.nexus[0].modId, "30379");
+    assert.strictEqual(info.nexus[1].externalRequirement, true);
+    assert.strictEqual(info.dlc.length, 1);
+    assert.strictEqual(info.totalCount, 2);
+
+    await service.modRequirements("skyrimspecialedition", 100);
+    assert.strictEqual(requestCount - before, 2, "ResolveGame + ModRequirements，第二次命中缓存");
   });
 
   await testAsync("GraphQL errors[] 归一化为 code", async () => {
@@ -666,7 +778,7 @@ async function main() {
   // -------------------------------------------------------------------------
   // 8) 选文件（ui/chooseFile）：只认 MAIN；多个 MAIN 才弹窗
   // -------------------------------------------------------------------------
-  const { chooseModFile, mainFilesOf } = require("../dist/ui/chooseFile.js");
+  const { chooseModFile, mainFilesOf, CHOOSE_FILE_ACTION } = require("../dist/ui/chooseFile.js");
 
   console.log("\n[8] 选文件");
 
@@ -692,14 +804,14 @@ async function main() {
   });
 
   await testAsync("只有一个主文件：不弹窗，直接返回", async () => {
-    const api = fakeDialogApi({ action: "Download", input: {} });
+    const api = fakeDialogApi({ action: CHOOSE_FILE_ACTION.download, input: {} });
     const file = await chooseModFile(api, "Test", [OPTIONAL, MAIN_A]);
     assert.strictEqual(file.fileId, 11);
     assert.strictEqual(api.calls.length, 0, "不应弹窗");
   });
 
   await testAsync("多个主文件：弹窗，选项只含主文件，默认选中 primary", async () => {
-    const api = fakeDialogApi({ action: "Download", input: { "file-12": true } });
+    const api = fakeDialogApi({ action: CHOOSE_FILE_ACTION.download, input: { "file-12": true } });
     const file = await chooseModFile(api, "Test", [MAIN_A, MAIN_B, OPTIONAL, OLD]);
 
     assert.strictEqual(api.calls.length, 1, "应弹一次窗");
@@ -715,32 +827,38 @@ async function main() {
     assert.strictEqual(preselected.length, 1, "应恰好预选一个");
     assert.strictEqual(preselected[0].id, "file-12", "预选 primary=1 的那个");
     assert.ok(content.choices[0].subText.indexOf("主文件") !== -1, "副标题应带分类");
-    assert.strictEqual(actions[1].label, "Download");
+    assert.strictEqual(actions[1].label, CHOOSE_FILE_ACTION.download);
+    // Download 是默认主按钮 → Cancel 保持灰色次要按钮
+    assert.strictEqual(actions[0].default, undefined, "Cancel 不应是主按钮");
+    assert.strictEqual(actions[1].default, true, "Download 应是默认主按钮");
+    // 文案是英文（零宽空格只是为了绕开宿主 i18n，不显示出来）
+    assert.strictEqual(actions[0].label.replace(/\u200B/g, ""), "Cancel");
+    assert.strictEqual(actions[1].label.replace(/\u200B/g, ""), "Download");
 
     assert.strictEqual(file.fileId, 12);
   });
 
   await testAsync("用户选了另一个主文件", async () => {
-    const api = fakeDialogApi({ action: "Download", input: { "file-11": true } });
+    const api = fakeDialogApi({ action: CHOOSE_FILE_ACTION.download, input: { "file-11": true } });
     const file = await chooseModFile(api, "Test", [MAIN_A, MAIN_B]);
     assert.strictEqual(file.fileId, 11);
   });
 
   await testAsync("用户点取消：返回 undefined", async () => {
-    const api = fakeDialogApi({ action: "Cancel", input: {} });
+    const api = fakeDialogApi({ action: CHOOSE_FILE_ACTION.cancel, input: {} });
     const file = await chooseModFile(api, "Test", [MAIN_A, MAIN_B]);
     assert.strictEqual(file, undefined);
   });
 
   await testAsync("没有主文件：退回按日期最新的文件", async () => {
-    const api = fakeDialogApi({ action: "Download", input: {} });
+    const api = fakeDialogApi({ action: CHOOSE_FILE_ACTION.download, input: {} });
     const file = await chooseModFile(api, "Test", [OPTIONAL, OLD]);
     assert.strictEqual(file.fileId, 13, "OPTIONAL 日期 50 > OLD 日期 10");
     assert.strictEqual(api.calls.length, 0, "不应弹窗");
   });
 
   await testAsync("空文件列表：返回 undefined", async () => {
-    const api = fakeDialogApi({ action: "Download", input: {} });
+    const api = fakeDialogApi({ action: CHOOSE_FILE_ACTION.download, input: {} });
     const file = await chooseModFile(api, "Test", []);
     assert.strictEqual(file, undefined);
   });
@@ -1003,6 +1121,330 @@ async function main() {
     );
     assert.strictEqual(outcome.pending, true);
     assert.strictEqual(outcome.timedOut, true);
+  });
+
+  console.log("\n[10] 详情弹窗数据（图片兜底 / 简介回退 / 换行归一化）");
+  const detailUtil = require("../dist/util/detail");
+
+  test("主图三级兜底：保序、去空、去重", () => {
+    assert.deepStrictEqual(
+      detailUtil.detailImageSources({
+        pictureUrl: "https://p/main.png",
+        thumbnailLargeUrl: "https://p/large.png",
+        thumbnailUrl: "https://p/small.png",
+      }),
+      ["https://p/main.png", "https://p/large.png", "https://p/small.png"],
+    );
+    // 热门 MOD 常见的"主图为 null"：自动把大缩略图顶到第一位
+    assert.deepStrictEqual(
+      detailUtil.detailImageSources({ pictureUrl: null, thumbnailLargeUrl: "https://p/large.png" }),
+      ["https://p/large.png"],
+    );
+    // 重复 URL 只留一份；空白串当没有
+    assert.deepStrictEqual(
+      detailUtil.detailImageSources({
+        pictureUrl: "https://p/main.png",
+        thumbnailLargeUrl: "https://p/main.png",
+        thumbnailUrl: "   ",
+      }),
+      ["https://p/main.png"],
+    );
+    assert.deepStrictEqual(detailUtil.detailImageSources({}), []);
+    assert.deepStrictEqual(detailUtil.detailImageSources(undefined), []);
+  });
+
+  test("简介回退链：description → summary → 兜底文案", () => {
+    assert.strictEqual(
+      detailUtil.detailBody({ description: "[b]full[/b]", summary: "short" }),
+      "[b]full[/b]",
+    );
+    assert.strictEqual(detailUtil.detailBody({ description: "   ", summary: "short" }), "short");
+    assert.strictEqual(detailUtil.detailBody({ description: "", summary: "" }), detailUtil.EMPTY_DESCRIPTION);
+    assert.strictEqual(detailUtil.detailBody(undefined), detailUtil.EMPTY_DESCRIPTION);
+    // 只有 <br /> 的描述渲染出来是空白 → 也算"没提供简介"
+    assert.strictEqual(detailUtil.detailBody({ description: "<br />", summary: "" }), detailUtil.EMPTY_DESCRIPTION);
+  });
+
+  test("换行归一化成成对的 [br][/br]（裸 \\n 不丢、不双倍）", () => {
+    // 真实 N 网样本：BBCode + \n<br />，每个 <br> 前都带裸 \n
+    const real =
+      "[center][img]https://x/a.png[/img][/center]\n<br />[b]Features[/b]\n<br />" +
+      "[list]\n<br />[*]One[/*]\n<br />[/list]";
+    const normalized = detailUtil.normalizeDetailText(real);
+
+    assert.strictEqual(normalized.indexOf("<br"), -1, "不应残留 HTML <br>");
+    assert.strictEqual(
+      (normalized.match(/\[br\]\[\/br\]/g) || []).length,
+      4,
+      "4 个换行应变成 4 个 [br][/br]（没有因为 \\n + <br> 而翻倍）",
+    );
+    // 关键：每个 [br] 必须成对，否则宿主的解析器会把后续正文吞进 BrTag
+    assert.strictEqual(/\[br\](?!\[\/br\])/.test(normalized), false, "[br] 必须成对出现");
+    assert.ok(normalized.indexOf("[b]Features[/b]") !== -1, "正文不能被吞掉");
+  });
+
+  test("换行归一化：裸换行、CRLF、首尾空行", () => {
+    assert.strictEqual(detailUtil.normalizeDetailText("A\nB"), "A[br][/br]B");
+    assert.strictEqual(detailUtil.normalizeDetailText("A\r\n<br />B"), "A[br][/br]B");
+    assert.strictEqual(detailUtil.normalizeDetailText("\n<br />A\n<br />\n<br />"), "A");
+    assert.strictEqual(detailUtil.normalizeDetailText(""), "");
+    assert.strictEqual(detailUtil.normalizeDetailText(undefined), "");
+  });
+
+  test("元信息：作者 · 版本 · 下载 · 点赞（缺项自动省略）", () => {
+    assert.strictEqual(
+      detailUtil.detailMeta({
+        uploader: { name: "Stracker" },
+        version: "1.24",
+        downloads: 1284000,
+        endorsements: 21800,
+      }),
+      "Stracker  ·  v1.24  ·  1.28M downloads  ·  21.8K endorsements",
+    );
+    assert.strictEqual(detailUtil.detailMeta({ author: "Solo" }), "Solo");
+    assert.strictEqual(detailUtil.detailMeta({}), "");
+    assert.strictEqual(detailUtil.detailMeta(undefined), "");
+  });
+
+  console.log("\n[11] 前置弹窗数据（行模型 / 手动标记 / 选文件 / 偏好）");
+  const reqUtil = require("../dist/util/requirements");
+  const prefsState = require("../dist/state/prefs");
+  const modsUtil = require("../dist/util/mods");
+  const fileUtil = require("../dist/util/modFiles");
+
+  const REQ_INFO = {
+    gameNumericId: "1704",
+    legacyModRequirementsEnabled: true,
+    totalCount: 7,
+    nexus: [
+      {
+        gameId: "1704",
+        modId: "30379",
+        modName: "SKSE &amp; Tools",
+        notes: "需要 1.6.640+",
+        url: "",
+        externalRequirement: false,
+      },
+      { gameId: "1704", modId: "266", modName: "USSEP", externalRequirement: false },
+      { gameId: "1704", modId: "999", modName: "Manual Mod", externalRequirement: false },
+      { gameId: "1704", modId: "123", modName: "Installed Mod", externalRequirement: false },
+      {
+        gameId: "1704",
+        modId: "0",
+        modName: "VC++ &amp; .NET",
+        url: "https://example.invalid/vc",
+        externalRequirement: true,
+      },
+      { gameId: "9999", modId: "555", modName: "Cross Game", url: "", externalRequirement: false },
+      { gameId: "1704", modId: "100", modName: "Self", externalRequirement: false },
+    ],
+    dlc: [
+      { gameExpansion: { id: "73,1704", name: "Saints &amp; Seducers" }, notes: "" },
+      { gameExpansion: { id: "73,1704", name: "Saints &amp; Seducers" }, notes: "" },
+    ],
+  };
+
+  const buildRows = (info) =>
+    reqUtil.buildRequirementRows({
+      info,
+      installed: new Map([[123, { version: "1.2.3" }]]),
+      manual: [999],
+      domain: "skyrimspecialedition",
+      selfModId: 100,
+    });
+
+  test("前置行模型：分类 / 排序 / 链接 / 本地版本", () => {
+    const rows = buildRows(REQ_INFO);
+    assert.deepStrictEqual(
+      rows.map((row) => row.kind),
+      ["missing", "missing", "manual", "installed", "external", "otherGame"],
+    );
+    assert.strictEqual(rows[0].name, "SKSE & Tools");
+    assert.strictEqual(
+      rows[0].url,
+      "https://www.nexusmods.com/skyrimspecialedition/mods/30379",
+    );
+    assert.strictEqual(rows[0].notes, "需要 1.6.640+");
+    assert.strictEqual(rows[2].kind, "manual");
+    assert.strictEqual(rows[2].downloadable, false, "不再提醒的行不参与下载");
+    assert.strictEqual(rows[3].localVersion, "1.2.3");
+    assert.strictEqual(rows[3].downloadable, false);
+    assert.strictEqual(rows[4].modId, 0);
+    assert.strictEqual(rows[4].url, "https://example.invalid/vc");
+    assert.strictEqual(rows[5].url, undefined);
+    // 自己依赖自己要被丢掉
+    assert.strictEqual(rows.some((row) => row.name === "Self"), false);
+  });
+
+  test("DLC 去重 + 实体解码", () => {
+    const dlc = reqUtil.buildDlcRows(REQ_INFO);
+    assert.strictEqual(dlc.length, 1);
+    assert.strictEqual(dlc[0].name, "Saints & Seducers");
+  });
+
+  test("默认勾选只包含未安装项", () => {
+    const rows = buildRows(REQ_INFO);
+    assert.deepStrictEqual(reqUtil.defaultSelectedModIds(rows), [30379, 266]);
+    assert.deepStrictEqual(
+      reqUtil.downloadableRows(rows).map((row) => row.modId),
+      [30379, 266],
+    );
+  });
+
+  test("不再提醒：勾上=mark，取消=unmark", () => {
+    assert.deepStrictEqual(reqUtil.diffIgnoredMarks([999], [999, 30379]), {
+      mark: [30379],
+      unmark: [],
+    });
+    assert.deepStrictEqual(reqUtil.diffIgnoredMarks([999], []), {
+      mark: [],
+      unmark: [999],
+    });
+    assert.deepStrictEqual(reqUtil.diffIgnoredMarks([], []), { mark: [], unmark: [] });
+    assert.deepStrictEqual(reqUtil.diffIgnoredMarks([1, 2], [2, 3]), {
+      mark: [3],
+      unmark: [1],
+    });
+  });
+
+  test("只有未安装的 Nexus 前置才弹窗（已装/DLC/站外不触发）", () => {
+    const onlyInstalled = reqUtil.buildRequirementRows({
+      info: { ...REQ_INFO, nexus: [REQ_INFO.nexus[3]], dlc: [] },
+      installed: new Map([[123, { version: "1" }]]),
+      manual: [],
+      domain: "d",
+      selfModId: 1,
+    });
+    assert.strictEqual(onlyInstalled[0].kind, "installed");
+    assert.strictEqual(reqUtil.hasRequirementsPrompt(onlyInstalled, []), false);
+    // 只剩已安装 + DLC：不弹（DLC 只在弹窗因未安装前置打开时附带显示）
+    assert.strictEqual(reqUtil.hasRequirementsPrompt(onlyInstalled, [{ name: "DLC" }]), false);
+
+    // 只剩"不再提醒"的前置 → 不再弹窗
+    const onlyIgnored = reqUtil.buildRequirementRows({
+      info: { ...REQ_INFO, nexus: [REQ_INFO.nexus[2]], dlc: [] },
+      installed: new Map(),
+      manual: [999],
+      domain: "d",
+      selfModId: 1,
+    });
+    assert.strictEqual(onlyIgnored[0].kind, "manual");
+    assert.strictEqual(reqUtil.hasRequirementsPrompt(onlyIgnored, []), false);
+
+    // 只有站外组件 → 不弹
+    const onlyExternal = reqUtil.buildRequirementRows({
+      info: { ...REQ_INFO, nexus: [REQ_INFO.nexus[4]], dlc: [] },
+      installed: new Map(),
+      manual: [],
+      domain: "d",
+      selfModId: 1,
+    });
+    assert.strictEqual(onlyExternal[0].kind, "external");
+    assert.strictEqual(reqUtil.hasRequirementsPrompt(onlyExternal, []), false);
+
+    // 有未安装的 Nexus 前置 → 弹（DLC 一起显示）
+    const rows = buildRows(REQ_INFO);
+    assert.strictEqual(reqUtil.hasRequirementsPrompt(rows, []), true);
+    assert.strictEqual(reqUtil.hasRequirementsPrompt(rows, [{ name: "DLC" }]), true);
+  });
+
+  test("行状态文案", () => {
+    const rows = buildRows(REQ_INFO);
+    assert.strictEqual(reqUtil.rowStatusLabel(rows[0]), "未安装");
+    assert.strictEqual(reqUtil.rowStatusLabel(rows[2]), "不再提醒");
+    assert.strictEqual(reqUtil.rowStatusLabel(rows[3]), "已安装 v1.2.3");
+    assert.strictEqual(reqUtil.rowStatusLabel(rows[4]), "站外组件");
+    assert.strictEqual(reqUtil.rowStatusLabel(rows[5]), "其他游戏");
+  });
+
+  test("pickPrimaryFile：primary → 最新 MAIN → 最新文件", () => {
+    const mains = [
+      { fileId: 10, name: "new-main", category: "MAIN", primary: 0, date: 300 },
+      { fileId: 11, name: "primary-main", category: "MAIN", primary: 1, date: 100 },
+      { fileId: 12, name: "optional", category: "OPTIONAL", primary: 0, date: 400 },
+    ];
+    assert.strictEqual(fileUtil.pickPrimaryFile(mains).fileId, 11);
+    assert.strictEqual(fileUtil.pickPrimaryFile([mains[0], mains[2]]).fileId, 10);
+    assert.strictEqual(fileUtil.pickPrimaryFile([mains[2]]).fileId, 12);
+    assert.strictEqual(fileUtil.pickPrimaryFile([]), undefined);
+    assert.strictEqual(fileUtil.pickPrimaryFile(undefined), undefined);
+  });
+
+  test("installedNexusMods 带本地版本，排除合集", () => {
+    const state = {
+      persistent: {
+        mods: {
+          skyrimse: {
+            a: { attributes: { modId: 1, version: "1.0" } },
+            b: { attributes: { modId: 1 } },
+            c: { type: "collection", attributes: { modId: 2, version: "2.0" } },
+            d: { attributes: { modId: 3, version: "3.0" } },
+            e: {},
+          },
+        },
+      },
+    };
+    const map = modsUtil.installedNexusMods(state, "skyrimse");
+    assert.strictEqual(map.get(1).version, "1.0");
+    assert.strictEqual(map.has(2), false);
+    assert.strictEqual(map.get(3).version, "3.0");
+    assert.deepStrictEqual(modsUtil.installedNexusModIds(state, "skyrimse"), [1, 3]);
+  });
+
+  test("手动安装标记：去重 / 排序 / 删除空域名", () => {
+    const reducePrefs = (state, action) =>
+      prefsState.prefsReducerSpec.reducers[action.type](state, action.payload);
+    let state = prefsState.PREFS_DEFAULTS;
+    state = reducePrefs(
+      state,
+      prefsState.prefsActions.markManualRequirement("skyrimspecialedition", 30379),
+    );
+    state = reducePrefs(
+      state,
+      prefsState.prefsActions.markManualRequirement("skyrimspecialedition", 30379),
+    );
+    state = reducePrefs(
+      state,
+      prefsState.prefsActions.markManualRequirement("skyrimspecialedition", 266),
+    );
+    assert.deepStrictEqual(state.manualRequirements["skyrimspecialedition"], [266, 30379]);
+
+    state = reducePrefs(
+      state,
+      prefsState.prefsActions.unmarkManualRequirement("skyrimspecialedition", 30379),
+    );
+    assert.deepStrictEqual(state.manualRequirements["skyrimspecialedition"], [266]);
+
+    state = reducePrefs(
+      state,
+      prefsState.prefsActions.unmarkManualRequirement("skyrimspecialedition", 266),
+    );
+    assert.deepStrictEqual(state.manualRequirements, {});
+    assert.deepStrictEqual(prefsState.prefsSlice({}), prefsState.PREFS_DEFAULTS);
+  });
+
+  await testAsync("buildRequirementsPromptData：查询 + 行模型 + DLC", async () => {
+    responder = defaultResponder;
+    const prompt = require("../dist/ui/requirementsPrompt");
+    const api = { getState: () => ({}), sendNotification: () => {} };
+
+    const data = await prompt.buildRequirementsPromptData(api, {
+      domain: "skyrimspecialedition",
+      internalGameId: "skyrimse",
+      modId: 100,
+      modName: "A Mod",
+      installed: new Map(),
+      manual: [],
+      freeAccount: false,
+    });
+
+    assert.ok(data, "应返回弹窗数据");
+    assert.strictEqual(data.modName, "A Mod");
+    assert.deepStrictEqual(data.rows.map((row) => row.kind), ["missing", "external"]);
+    assert.deepStrictEqual(data.defaultSelected, [30379]);
+    assert.strictEqual(data.dlc.length, 1);
+    assert.strictEqual(data.dlc[0].name, "Saints & Seducers");
+    assert.strictEqual(data.freeAccount, false);
   });
 
   console.log(`\n通过 ${passed} 项。`);

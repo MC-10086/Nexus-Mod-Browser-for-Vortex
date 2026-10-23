@@ -110,4 +110,35 @@ function generate(count) {
   return out;
 }
 
-module.exports = { generate };
+/**
+ * 详情弹窗用的长简介（贴近真实 N 网写法：BBCode + \n<br /> 换行）
+ * 目的：在静态预览里看长文滚动、粗体、链接、列表的排版。
+ */
+const DESCRIPTION = [
+  "[center][b]A comprehensive QoL overhaul[/b][/center]",
+  "[b]Features[/b]",
+  "[list]",
+  "[*]Full-text search across every container and merchant in the game.[/*]",
+  "[*]Sortable, filterable inventory columns with extended data.[/*]",
+  "[*]Eight customizable hotkey groups for your favourites.[/*]",
+  "[*]MCM support for every option, including per-save overrides.[/*]",
+  "[/list]",
+  "[b]Installation[/b]",
+  "Install with your mod manager, then run the game once so the MCM registers itself.",
+  "[url=https://www.nexusmods.com/skyrimspecialedition]Open the mod page on Nexus Mods[/url]",
+  "[quote]This description is only sample text used by the local preview build. It is not part of the extension bundle.[/quote]",
+  "[b]Compatibility[/b]",
+  "Works with the vanilla UI and with most interface overhauls. Load it after any mod that replaces the inventory menu.",
+].join("\n<br />");
+
+/** 给假的 Mod 补上"详情"字段（主图 + 大/小缩略图 + 长简介） */
+function detailOf(mod) {
+  return {
+    ...mod,
+    description: DESCRIPTION,
+    thumbnailLargeUrl: cover((mod.modId % 360) + 40, "large thumbnail"),
+    thumbnailUrl: cover((mod.modId % 360) + 80, "thumbnail"),
+  };
+}
+
+module.exports = { generate, detailOf, DESCRIPTION };

@@ -82,3 +82,27 @@ export function compareModFiles(lhs: IModFile, rhs: IModFile): number {
   }
   return (rhs.date ?? 0) - (lhs.date ?? 0);
 }
+
+/**
+ * 前置下载用的"自动选文件"：不弹任何选择框。
+ * 规则（与网站默认行为一致）：
+ *   1. 主文件里带 primary === 1 的（网站标记的默认文件）
+ *   2. 否则最新的主文件（files 已按主文件优先 + 日期倒序排列）
+ *   3. 一个主文件都没有 → 最新的文件（避免完全下不了）
+ *   4. 一个文件都没有 → undefined
+ */
+export function pickPrimaryFile(files: IModFile[] | undefined | null): IModFile | undefined {
+  if (files === undefined || files === null || files.length === 0) {
+    return undefined;
+  }
+
+  const mains = files.filter((file) => isMainFile(file));
+  const primary = mains.find((file) => file.primary === 1);
+  if (primary !== undefined) {
+    return primary;
+  }
+  if (mains.length > 0) {
+    return mains[0];
+  }
+  return files[0];
+}

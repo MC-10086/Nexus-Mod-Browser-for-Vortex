@@ -21,6 +21,10 @@ export interface IModSummary {
   createdAt?: string;
   updatedAt?: string;
   pictureUrl?: string;
+  /** 大缩略图，主图失效时兜底（详情查询里有，列表查询没查） */
+  thumbnailLargeUrl?: string;
+  /** 小缩略图，最后兜底（详情查询里有，列表查询没查） */
+  thumbnailUrl?: string;
   game?: { domainName?: string; id?: string };
   uploader?: { name?: string };
 }
@@ -55,6 +59,37 @@ export interface IModFile {
   description?: string;
 }
 
+/** 一条 Nexus 前置（对应 GraphQL `ModRequirement`） */
+export interface IModRequirement {
+  /** 前置所属游戏的**数字** id（如 "1704"），用来判断是不是同一个游戏 */
+  gameId?: string;
+  /** 前置的 Nexus mod id（字符串；站外组件是 "0"） */
+  modId: string;
+  modName: string;
+  /** 作者备注（版本要求等常常写在这里） */
+  notes?: string;
+  url?: string;
+  externalRequirement?: boolean;
+}
+
+/** 一条 DLC 前置（无法检测，只提示） */
+export interface IModDlcRequirement {
+  notes?: string;
+  gameExpansion?: { id?: string; name?: string };
+}
+
+/** `modRequirements()` 的返回值（已裁成插件好用的形状） */
+export interface IModRequirementsInfo {
+  /** 当前游戏在 Nexus 的数字 id（字符串形式） */
+  gameNumericId: string;
+  /** true = 作者用的是旧版"mod 级依赖"模型 */
+  legacyModRequirementsEnabled?: boolean;
+  nexus: IModRequirement[];
+  dlc: IModDlcRequirement[];
+  /** 服务端总数（超过 50 时说明被截断） */
+  totalCount: number;
+}
+
 /** 一次搜索的查询参数 */
 export interface ISearchOptions {
   /** Nexus 游戏域名，如 skyrimspecialedition */
@@ -74,8 +109,7 @@ export interface ISearchResult {
   nodes: IModSummary[];
 }
 
-/** 插件自己的 state 切片（session.nexusBrowser） */
-export interface INexusBrowserState {
+/** 插件自己的 state 切片（session.nexusBrowser） */export interface INexusBrowserState {
   /** 当前结果对应的游戏域名；切换游戏时用于判断是否需要重查 */
   domain?: string;
   query: string;
@@ -87,6 +121,8 @@ export interface INexusBrowserState {
   error?: { code?: string; message: string };
   selectedModId?: number;
   detail?: IModDetail;
+  /** 详情加载失败的文案（成功或关闭时清空） */
+  detailError?: string;
   files: IModFile[];
   /** 详情/文件是否在加载 */
   detailLoading: boolean;
@@ -99,4 +135,13 @@ export interface INexusError extends Error {
   code?: string;
   /** GraphQL 原始 errors 数组 */
   errors?: any[];
+}
+
+/**
+ * 持久化偏好（persistent.nexusBrowserPrefs）
+ * 目前只有"手动安装的前置"：用户在弹窗里取消勾选 = 本地已经有了（网盘/手动装）。
+ */
+export interface INexusBrowserPrefs {
+  /** 游戏域名 → 已手动安装的前置 Nexus mod id 列表 */
+  manualRequirements: { [domain: string]: number[] };
 }
