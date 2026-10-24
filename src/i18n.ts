@@ -29,6 +29,7 @@ const EN = {
   "common.retry": "Retry",
   "common.close": "Close",
   "common.listSeparator": "; ",
+  "common.nameSeparator": ", ",
   "language.label": "Language",
 
   "page.tab": "Mods",
@@ -152,6 +153,7 @@ const ZH: Record<MessageKey, string> = {
   "common.retry": "重试",
   "common.close": "关闭",
   "common.listSeparator": "；",
+  "common.nameSeparator": "、",
   "language.label": "语言",
 
   "page.tab": "模组",

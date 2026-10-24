@@ -369,7 +369,7 @@ export default function RequirementsDialog(props: IRequirementsDialogProps) {
               >
                 <p className="text-body-sm font-semibold">{t("requirements.dlcTitle")}</p>
                 <p className="text-body-sm text-neutral-moderate">
-                  {data.dlc.map((dlc) => dlc.name).join("、")}
+                  {data.dlc.map((dlc) => dlc.name).join(t("common.nameSeparator"))}
                 </p>
                 <p className="text-body-xs text-neutral-subdued">
                   {t("requirements.dlcNote")}

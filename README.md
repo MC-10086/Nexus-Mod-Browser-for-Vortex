@@ -47,7 +47,8 @@
 1. 在 Games 页面激活一个游戏；
 2. 左侧导航点 **Nexus Mod Browser**（快捷键 `Ctrl+Shift+B`，图标是镜像的放大镜）；
 3. 输入关键词回车，或直接浏览热门；
-4. 点 **Download** 下载并安装（有前置时会先弹前置窗），点 **View page** 去网站看详情，或点 **Details** 在 Vortex 里看主图 + 完整简介。
+4. 页头右侧的**语言选择框**切换 **中文 / English**——只影响插件 UI，N 网内容始终原样显示；
+5. 点 **Download / 下载** 下载并安装（有前置时会先弹前置窗），点 **View page / 查看页面** 去网站看详情，或点 **Details / 详情** 在 Vortex 里看主图 + 完整简介。
 
 ## 前置（Requirements）
 
