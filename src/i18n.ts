@@ -7,11 +7,12 @@
  *   - 不引入 i18next 等运行时库；字典直接编译进 JS，查表是 O(1)。
  */
 
-export type Language = "zh" | "en";
+export type Language = "zh" | "en" | "ja";
 
 export const LANGUAGES: Array<{ id: Language; label: string }> = [
   { id: "zh", label: "中文" },
   { id: "en", label: "English" },
+  { id: "ja", label: "日本語" },
 ];
 
 const EN = {
@@ -260,7 +261,129 @@ const ZH: Record<MessageKey, string> = {
   "download.downloadFailed": "下载失败",
 };
 
-const MESSAGES: Record<Language, Record<MessageKey, string>> = { en: EN, zh: ZH };
+const JA: Record<MessageKey, string> = {
+  "common.download": "ダウンロード",
+  "common.downloading": "ダウンロード中…",
+  "common.viewPage": "ページを表示",
+  "common.details": "詳細",
+  "common.skip": "スキップ",
+  "common.continue": "続行",
+  "common.requested": "リクエスト済み",
+  "common.selectAll": "すべて選択",
+  "common.search": "検索",
+  "common.refresh": "更新",
+  "common.login": "ログイン",
+  "common.retry": "再試行",
+  "common.close": "閉じる",
+  "common.listSeparator": "、",
+  "common.nameSeparator": "、",
+  "language.label": "言語",
+
+  "page.tab": "MOD",
+  "page.activatePlaceholder": "先にゲームを有効化してください…",
+  "page.searchPlaceholder": "{game} 内を検索…",
+  "page.results": "{count} 件の結果",
+  "page.activateGame": "先に Games ページでゲームを有効化してください。",
+  "page.emptyQuery": "「{query}」に一致する MOD は見つかりませんでした。",
+  "page.emptyNoResults": "このゲームの結果はまだありません。",
+  "page.browseSite": "ウェブサイトで閲覧",
+
+  "card.installed": "インストール済み !",
+  "card.installedTitle": "この MOD はインストール済みです",
+  "card.adult": "成人向け",
+  "card.downloadTitle": "ダウンロードしてインストール",
+  "card.viewPageTitle": "Nexus Mods で開く",
+  "card.detailsTitle": "MOD の詳細を表示",
+
+  "detail.fallbackTitle": "MOD の詳細",
+  "detail.empty": "この MOD には説明がありません。",
+  "detail.downloads": "ダウンロード {count} 回",
+  "detail.endorsements": "推薦 {count} 件",
+
+  "status.notInstalled": "未インストール",
+  "status.ignored": "通知しない",
+  "status.installed": "インストール済み",
+  "status.installedVersion": "インストール済み v{version}",
+  "status.external": "外部コンポーネント",
+  "status.otherGame": "他のゲーム",
+
+  "requirements.title": "必要な前提 MOD",
+  "requirements.subtitle": "{modName} · 前提 MOD {count} 件（未インストール {missing} 件）",
+  "requirements.unnamedMod": "MOD {modId}",
+  "requirements.ignore": "通知しない",
+  "requirements.ignoreLabel": "{name} を通知しない",
+  "requirements.ignoreHint": "今後どの MOD でもこの前提をスキップし、通知しません。",
+  "requirements.ignoredTitle": "通知しない設定です",
+  "requirements.installedTitle": "Vortex でインストール済み",
+  "requirements.requestedTitle": "リクエスト済み",
+  "requirements.downloadTitle": "この前提をダウンロード",
+  "requirements.cannotDownloadTitle": "自動ダウンロードできません",
+  "requirements.dlcTitle": "次の DLC も必要です",
+  "requirements.dlcNote": "DLC のインストール状態は自動検出できません。手動で確認してください。",
+  "requirements.selected": "（{selected}/{total} 件選択）",
+  "requirements.skipTitle": "前提をスキップして MOD をダウンロード",
+  "requirements.downloadSelected": "選択項目をダウンロード（{count}）",
+  "requirements.downloadSelectedTitle": "選択した前提をダウンロードしてから MOD をダウンロード",
+
+  "filePicker.title": "ダウンロードするファイルを選択",
+  "filePicker.text": "{modName} のメインファイルは {count} 個あります。ダウンロードするものを選択してください。",
+
+  "category.main": "メインファイル",
+  "category.update": "更新",
+  "category.optional": "オプションファイル",
+  "category.oldVersion": "旧バージョン",
+  "category.misc": "その他",
+  "category.removed": "削除済み",
+  "category.archived": "アーカイブ済み",
+
+  "sort.relevance": "関連度",
+  "sort.endorsements": "推薦が多い順",
+  "sort.downloads": "ダウンロードが多い順",
+  "sort.updatedAt": "最近更新された順",
+  "sort.createdAt": "新着順",
+  "sort.title": "並び替え",
+
+  "pagination.prev": "前のページ",
+  "pagination.next": "次のページ",
+  "pagination.page": "{page} ページ",
+
+  "notify.noGame": "ダウンロードできません：有効なゲームがありません。",
+  "notify.noFiles": "ダウンロードできません：この MOD にはダウンロード可能なファイルがありません。",
+  "notify.cancelled": "ダウンロードをキャンセルしました",
+  "notify.alreadyInQueue": "すでにダウンロードキューにあります：{name}",
+  "notify.pendingFree": "ダウンロードを検出できませんでした。ページを閉じた場合は「{button}」をもう一度クリックしてください。",
+  "notify.pending": "ダウンロードは進行中です。左側の「ダウンロード」ページで確認できます。",
+  "notify.installed": "ダウンロードしてインストールしました：{name}",
+  "notify.queued": "ダウンロードキューに追加しました：{name}",
+  "notify.downloadFailed": "ダウンロードに失敗しました：{error}",
+  "notify.reqFilesFailed": "前提 {name} のファイル一覧を取得できませんでした。",
+  "notify.reqNoFile": "前提 {name} にはダウンロード可能なファイルがありません。",
+  "notify.reqDownloadFailed": "前提 {name} のダウンロードに失敗しました。",
+  "notify.reqSummaryFree": "ブラウザで前提ページを {count} 件開きました",
+  "notify.reqSummaryPremium": "前提 {count} 件のダウンロードを開始しました",
+  "notify.reqSummaryFailed": "{count} 件を自動ダウンロードできませんでした。{button} で手動対応してください。",
+  "notify.reqSummarySuffix": "（各ページで「Mod manager download」を1回クリックしてください）",
+
+  "error.login": "Nexus Mods にログインする必要があります。Vortex 右上からログインして再試行してください。",
+  "error.adult": "このコンテンツは Nexus の成人向けコンテンツ設定でブロックされています。Nexus のアカウント設定で Adult Content を変更してください。",
+  "error.notFound": "要求されたリソースが見つかりません（削除または非表示になった可能性があります）。",
+  "error.schema": "Nexus がクエリを拒否しました（{code}）。プラグインと API のバージョンが一致していない可能性があります。更新してください。",
+  "error.generic": "Nexus API へのリクエストに失敗しました",
+  "error.timeout": "Nexus API へのリクエストがタイムアウトしました。接続を確認して再試行してください。",
+  "error.connect": "api.nexusmods.com に接続できません：{message}",
+  "error.rateLimit": "リクエストが多すぎます（HTTP 429）。しばらく待ってから再試行してください。",
+  "error.forbidden": "Nexus がリクエストを拒否しました（HTTP 403）。API キーが無効か権限が不足している可能性があります。",
+  "error.http": "Nexus API が HTTP {status} を返しました：{body}",
+  "error.nonJson": "Nexus API が JSON 以外の内容を返しました：{body}",
+  "error.empty": "Nexus API が空のデータを返しました。",
+  "error.noGamePage": "ゲーム「{domain}」には Nexus Mods のページがありません。",
+  "error.modNotFound": "Mod {modId} が見つかりません（削除または非表示になった可能性があります）。",
+
+  "download.installFailed": "インストールに失敗しました",
+  "download.downloadFailed": "ダウンロードに失敗しました",
+};
+
+const MESSAGES: Record<Language, Record<MessageKey, string>> = { en: EN, zh: ZH, ja: JA };
 
 let current: Language = "zh";
 
@@ -274,7 +397,7 @@ export function getLanguage(): Language {
 }
 
 export function isLanguage(value: unknown): value is Language {
-  return value === "zh" || value === "en";
+  return value === "zh" || value === "en" || value === "ja";
 }
 
 /** O(1) 查表 + `{name}` 占位符替换；不解析 JSON、不做正则大循环 */

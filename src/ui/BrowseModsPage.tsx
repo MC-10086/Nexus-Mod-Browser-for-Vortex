@@ -19,7 +19,7 @@ import { MainPage } from "@nexusmods/vortex-api";
 
 import { downloadForUser } from "../bridge/download";
 import { DEFAULT_PAGE_SIZE, SORT_OPTIONS } from "../constants";
-import { LANGUAGES, Language, setLanguage as setCurrentLanguage, t } from "../i18n";
+import { LANGUAGES, Language, isLanguage, setLanguage as setCurrentLanguage, t } from "../i18n";
 import { describeError } from "../nexus/client";
 import { getNexusService, resetNexusService } from "../nexus/index";
 import { actions, nexusBrowserSlice } from "../state/reducer";
@@ -229,10 +229,10 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
 
   /**
    * 语言切换：只在这里改变一次（模块 t + React state + 持久化偏好各一次）。
-   * 不发请求、不重置搜索、不订阅宿主语言。
+   * 复用页面上已有的 SortMenu 下拉，不发请求、不重置搜索、不订阅宿主语言。
    */
-  const handleLanguageChange = (evt: any) => {
-    const next: Language = evt?.target?.value === "en" ? "en" : "zh";
+  const handleLanguageChange = (nextId: string) => {
+    const next: Language = isLanguage(nextId) ? nextId : "zh";
     if (next === language) {
       return;
     }
@@ -663,20 +663,14 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
             </div>
 
             <div className="flex items-center gap-x-2">
-              <select
-                className="nxm-input"
-                style={{ width: 110 }}
+              {/* 复用已有的下拉组件，不再自己写 <select> */}
+              <SortMenu
+                options={LANGUAGES.map((item) => ({ id: item.id, label: item.label }))}
                 value={language}
-                aria-label={t("language.label")}
-                title={t("language.label")}
                 onChange={handleLanguageChange}
-              >
-                {LANGUAGES.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
+                title={t("language.label")}
+                width={120}
+              />
 
               <SortMenu
                 options={SORT_OPTIONS.map((option) => ({

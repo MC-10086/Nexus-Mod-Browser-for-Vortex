@@ -1469,6 +1469,12 @@ async function main() {
       i18n.t("filePicker.text", { modName: "Test", count: 2 }).indexOf("Test") >= 0,
       "占位符应被替换",
     );
+
+    i18n.setLanguage("ja");
+    assert.strictEqual(i18n.getLanguage(), "ja");
+    assert.strictEqual(i18n.t("common.download"), "ダウンロード");
+    assert.strictEqual(i18n.t("page.results", { count: 3 }), "3 件の結果");
+    assert.strictEqual(i18n.isLanguage("ja"), true);
     i18n.setLanguage("zh");
   });
 
@@ -1492,6 +1498,8 @@ async function main() {
     assert.strictEqual(i18n.t(SORT_OPTIONS[0].labelKey), "相关度");
     i18n.setLanguage("en");
     assert.strictEqual(i18n.t(SORT_OPTIONS[0].labelKey), "Relevance");
+    i18n.setLanguage("ja");
+    assert.strictEqual(i18n.t(SORT_OPTIONS[0].labelKey), "関連度");
     i18n.setLanguage("zh");
   });
 

@@ -234,6 +234,11 @@ export interface ISortMenuProps {
   options: ISortOption[];
   value: string;
   onChange: (id: string) => void;
+  /** 按钮 tooltip / aria；默认「排序方式」 */
+  title?: string;
+  /** 下拉宽度；默认 240（排序），语言选择可传更小 */
+  width?: number;
+  ariaLabel?: string;
 }
 
 /**
@@ -241,11 +246,12 @@ export interface ISortMenuProps {
  * 所以用 `nxm-dropdown-*` 类 + 一个受控的开关自己实现（少一个依赖）。
  */
 export function SortMenu(props: ISortMenuProps) {
-  const { options, value, onChange } = props;
+  const { options, value, onChange, title, width, ariaLabel } = props;
   const [open, setOpen] = React.useState(false);
   const current = options.find((option) => option.id === value) ?? options[0];
 
-  const WIDTH = 240;
+  const WIDTH = width ?? 240;
+  const buttonTitle = title ?? t("sort.title");
 
   return (
     <div className="relative">
@@ -255,7 +261,8 @@ export function SortMenu(props: ISortMenuProps) {
         brand="neutral"
         appearance="moderate"
         onClick={() => setOpen(!open)}
-        title={t("sort.title")}
+        title={buttonTitle}
+        ariaLabel={ariaLabel ?? buttonTitle}
         style={{ width: WIDTH, justifyContent: "flex-start" }}
         contentClassName="flex w-full items-center justify-between gap-x-1"
       >

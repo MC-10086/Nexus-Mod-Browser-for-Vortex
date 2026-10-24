@@ -287,12 +287,14 @@ function render(state) {
   assert.ok(text.indexOf("131 个结果") !== -1, "应显示结果数");
   assert.ok(text.indexOf("模组") !== -1, "应保留「模组」标签");
 
-  const languageSelects = findAll(tree, (el) => el.type === "select");
-  assert.strictEqual(languageSelects.length, 1, "页头应有语言选择框");
-  assert.strictEqual(languageSelects[0].props.value, "zh", "默认语言应为中文");
+  const languageMenus = findAll(
+    tree,
+    (el) => el.type === "button" && el.props && el.props.title === "语言",
+  );
+  assert.strictEqual(languageMenus.length, 1, "页头应有复用 SortMenu 的语言下拉");
   assert.ok(
-    textOf(languageSelects[0]).indexOf("English") !== -1,
-    "语言选择框应包含 English 选项",
+    textOf(languageMenus[0]).indexOf("中文") !== -1,
+    "语言下拉默认应显示中文",
   );
   assert.strictEqual(text.indexOf("整合包"), -1, "不应再有「整合包」标签");
 
