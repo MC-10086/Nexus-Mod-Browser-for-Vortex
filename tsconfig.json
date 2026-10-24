@@ -17,7 +17,7 @@
     "noUnusedLocals": false,
     "sourceMap": false,
     "declaration": false,
-    "removeComments": false,
+    "removeComments": true,
     "types": []
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/typings/**/*.d.ts"],
