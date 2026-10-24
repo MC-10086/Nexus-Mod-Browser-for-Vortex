@@ -2,19 +2,19 @@
  * 游戏上下文工具
  * ---------------------------------------------------------------------------
  * 目标：在**不 import `@nexusmods/vortex-api` 运行时**的前提下，
- * 复刻 Vortex 官方的 3 个选择器（源码位置见注释）。
+ * 实现插件需要的游戏上下文选择器。
  *
  * 为什么不能直接 import：
  *   `@nexusmods/vortex-api` 是**纯类型包**（runtime 只有类型，没有实现），
  *   扩展在运行时 `require('vortex-api')` 会直接抛 MODULE_NOT_FOUND。
  *   官方内置扩展之所以能用 util/selectors，是因为它们被编进了主 bundle，
- *   第三方扩展没有这个待遇 —— 所以这里按官方源码的实现逻辑自行复刻。
+ *   第三方扩展没有这个待遇 —— 所以这里按 Vortex 的状态结构自行实现。
  *
- * 复刻来源（Vortex 2.8.2）：
- *   activeGameId   → src/extensions/profile_management/selectors.ts:11
- *   knownGames     → src/extensions/gamemode_management/selectors.ts:11
- *   nexusGameId    → src/extensions/nexus_integration/util/convertGameId.ts:22
- *   apiKey/isPremium → src/extensions/nexus_integration/selectors.ts:11/25
+ * 选择器逻辑与 Vortex 2.8 保持一致：
+ *   - 当前游戏：settings.profiles.activeProfileId → persistent.profiles[id].gameId
+ *   - 游戏表：session.gameMode.known
+ *   - Nexus 域名：game.details.nexusPageId → 特殊映射 → 小写 id
+ *   - API Key / Premium：confidential.account.nexus / persistent.nexus.userInfo
  */
 
 /** Vortex 内部游戏记录（只声明我们要用的字段；不导出，外部只通过函数访问） */

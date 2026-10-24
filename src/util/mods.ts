@@ -8,7 +8,7 @@
  *   state.persistent.mods[gameId][internalModId].attributes.modId   ← Nexus 数字 mod id
  *   state.persistent.mods[gameId][internalModId].attributes.source  ← "nexus"
  *
- * 官方也是这么查的（mod_management/selectors.ts:118）：
+ * 判定方式与 Vortex 官方一致：
  *   Object.values(mods).find((mod) => mod.attributes?.modId === modId)
  *
  * 注意：合集（collection）本身也有 attributes.modId（那是合集的 mod id），

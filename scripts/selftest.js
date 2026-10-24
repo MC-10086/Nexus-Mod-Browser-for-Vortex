@@ -828,6 +828,52 @@ async function main() {
     assert.strictEqual(file.fileId, 12);
   });
 
+  await testAsync("主文件描述：清理 BBCode/HTML、解码实体并截断", async () => {
+    const files = [
+      {
+        fileId: 31,
+        name: "With description",
+        category: "MAIN",
+        version: "1.0",
+        description: "[b]R18[/b]<br />Only &amp; adults.",
+      },
+      {
+        fileId: 32,
+        name: "Long description",
+        category: "MAIN",
+        version: "1.0",
+        description: "x".repeat(300),
+      },
+      {
+        fileId: 33,
+        name: "No description",
+        category: "MAIN",
+        version: "1.0",
+      },
+    ];
+    const api = fakeDialogApi({
+      action: CHOOSE_FILE_ACTION.download,
+      input: { "file-31": true },
+    });
+
+    await chooseModFile(api, "Test", files);
+
+    const choices = api.calls[0][2].choices;
+    assert.ok(choices[0].subText.includes("R18 Only & adults."), "应保留描述文字");
+    assert.strictEqual(choices[0].subText.includes("[b]"), false, "不应显示 BBCode");
+    assert.strictEqual(choices[0].subText.includes("<br"), false, "不应显示 HTML 标签");
+
+    const longDescription = choices[1].subText.split(" — ").pop();
+    assert.ok(longDescription.endsWith("…"), "长描述应截断并加省略号");
+    assert.ok(longDescription.length <= 161, "描述片段应不超过 160 字符 + 省略号");
+
+    assert.strictEqual(
+      choices[2].subText.indexOf(" — "),
+      -1,
+      "没有描述时不应出现多余的分隔符",
+    );
+  });
+
   await testAsync("用户选了另一个主文件", async () => {
     const api = fakeDialogApi({ action: CHOOSE_FILE_ACTION.download, input: { "file-11": true } });
     const file = await chooseModFile(api, "Test", [MAIN_A, MAIN_B]);

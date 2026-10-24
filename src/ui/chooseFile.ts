@@ -49,9 +49,71 @@ function defaultFileOf(files: IModFile[]): IModFile | undefined {
   return files.slice().sort((lhs, rhs) => (rhs.date ?? 0) - (lhs.date ?? 0))[0];
 }
 
-/** 组装副标题："v1.2 · 12.3 MB · 2024-05-01 · 主文件" */
+/** 文件描述最多显示多少字符（原生弹窗副标题空间有限） */
+const DESCRIPTION_MAX_LENGTH = 160;
+
+/**
+ * 把 N 网文件描述整理成一行纯文本。
+ *
+ * N 网的 `ModFile.description` 实际是「BBCode + <br />」，而且可能非常长
+ *（作者会贴安装步骤、更新日志、链接等）。原生 showDialog 只适合放一行副标题，
+ * 所以这里只保留可读文字，并截到约 160 字符；完整内容仍可通过 View page 查看。
+ *
+ * 注意：这是 N 网内容，不翻译。
+ */
+function fileDescriptionOf(file: IModFile): string {
+  const raw = typeof file.description === "string" ? file.description : "";
+  if (raw.trim().length === 0) {
+    return "";
+  }
+
+  const plain = raw
+    // 图片整体丢弃（文件描述里偶尔会嵌预览图）
+    .replace(/\[img\][\s\S]*?\[\/img\]/gi, " ")
+    // [url=xxx]text[/url] / [url]xxx[/url] → text
+    .replace(/\[url=[^\]]*\]([\s\S]*?)\[\/url\]/gi, "$1")
+    .replace(/\[url\]([\s\S]*?)\[\/url\]/gi, "$1")
+    // 换行标签先变空格，避免把两段粘成一个词
+    .replace(/<br\s*\/?>/gi, " ")
+    // 其余 HTML 标签
+    .replace(/<[^>]+>/g, " ")
+    // 其余 BBCode（[b]、[/size]、[*] 等）
+    .replace(/\[\/?[a-z*][^\]]*\]/gi, " ")
+    // 常见实体
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0*39;|&apos;/gi, "'")
+    // 折叠空白（含原始 \n、\r）
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (plain.length <= DESCRIPTION_MAX_LENGTH) {
+    return plain;
+  }
+
+  const chars = Array.from(plain);
+  if (chars.length <= DESCRIPTION_MAX_LENGTH) {
+    return plain;
+  }
+  // 按 code point 截，避免把 emoji / 代理对切成半个字符
+  const cut = chars.slice(0, DESCRIPTION_MAX_LENGTH).join("");
+  const lastSpace = cut.lastIndexOf(" ");
+  // 英文尽量不截断单词；中文没有空格，直接截
+  const body = lastSpace > DESCRIPTION_MAX_LENGTH * 0.7
+    ? cut.slice(0, lastSpace)
+    : cut;
+  return body.replace(/[\s·—,.;:，。；：]+$/, "") + "…";
+}
+
+/**
+ * 组装副标题："v1.2 · 12.3 MB · 2024-05-01 · 主文件 — 文件描述…"
+ * 描述为空时保持原来的纯元信息。
+ */
 function subtitleOf(file: IModFile): string {
-  return [
+  const meta = [
     file.version !== undefined && file.version !== "" ? `v${file.version}` : undefined,
     formatBytes(file.sizeInBytes ?? file.size),
     file.date !== undefined ? formatUnixDate(file.date) : undefined,
@@ -59,6 +121,9 @@ function subtitleOf(file: IModFile): string {
   ]
     .filter((part) => part !== undefined && part !== "")
     .join(" · ");
+
+  const description = fileDescriptionOf(file);
+  return [meta, description].filter((part) => part.length > 0).join(" — ");
 }
 
 /**

@@ -6,10 +6,10 @@
  *   2. 简介回退链（description → summary → 兜底文案）
  *   3. 把 N 网描述里的换行统一成宿主 BBCode 渲染器认识的 [br]
  *
- * 换行处理的实测依据（2026-10-23，SkyUI / USSEP / MO2 三条真实 description）：
+ * 换行处理原因：
  *   N 网返回的是「BBCode + <br />」，且每个 <br /> 前通常还带一个裸 \n；
- *   而 bbcode-to-react 的 toReact() 把文本原样塞进 React（源码实证），
- *   裸 \n 会被浏览器折叠成空格，所以必须先归一化，否则长简介会变成一堵墙。
+ *   宿主的 bbcode-to-react 会把裸 \n 原样塞进 React，浏览器折叠成空格，
+ *   所以必须先归一化，否则长简介会变成一堵墙。
  */
 
 import { t } from "../i18n";

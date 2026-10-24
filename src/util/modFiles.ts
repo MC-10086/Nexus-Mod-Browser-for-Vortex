@@ -3,10 +3,10 @@
  * ---------------------------------------------------------------------------
  * 背景（容易踩的坑）：
  *   GraphQL 里 `ModFile.category` 的类型是**枚举** `ModFileCategory!`，
- *   文档里同时又写"database ID"——实际返回可能是数字 `1`，也可能是字符串 `"MAIN"`，
- *   取决于服务端序列化方式。所以判断"是不是主文件"必须两种都认。
+ *   但服务端可能返回数字 `1`，也可能返回字符串 `"MAIN"`（取决于序列化方式）。
+ *   所以判断"是不是主文件"必须两种都认。
  *
- * 枚举取值（见《NexusMods-GraphQL-API-完整参考.md》ModFileCategory）：
+ * 枚举取值：
  *   MAIN / UPDATE / OPTIONAL / OLD_VERSION / MISCELLANEOUS / REMOVED / ARCHIVED
  */
 

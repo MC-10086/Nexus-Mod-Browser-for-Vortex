@@ -1,9 +1,9 @@
 /**
  * GraphQL 查询定义
  * ---------------------------------------------------------------------------
- * 全部照抄方案文档 §5.1 的 4 条查询，字段都是实测可用的。
- * 修改字段前请先看《NexusMods-GraphQL-API-完整参考.md》对应章节，
- * 尤其是：
+ * 每条查询只请求插件真正消费的字段，避免响应体膨胀。
+ *
+ * 改字段前必须用真实 API / introspection 验证，尤其注意：
  *   - `mod(modId, gameId)` 两个参数都必须传
  *   - `modFiles.sizeInBytes` 是 BigInt，JSON 里是字符串
  *   - 报错时 HTTP 仍是 200，必须检查 errors[]
@@ -79,14 +79,15 @@ query ModFiles($modId: ID!, $gameId: ID!) {
     sizeInBytes
     uri
     date
+    description
   }
 }`;
 
 /**
  * Q3.5 前置（依赖）清单
  * ---------------------------------------------------------------------------
- * - `nexusRequirements(count: 50)`：N 网作者登记的必需 MOD。实测 count 支持到 50，
- *   默认 10 会截断（kryptopyr's Patch Hub 有 16 条）。
+ * - `nexusRequirements(count: 50)`：N 网作者登记的必需 MOD。50 可以覆盖常见的前置列表，
+ *   默认 10 会截断（例如补丁合集类 MOD）。
  * - `dlcRequirements`：需要的 DLC / 资料片，无法检测，只能提示。
  * - `legacyModRequirementsEnabled`：false = 新模型（文件级依赖），但公开 API 仍只暴露
  *   mod 级清单；**不要加 skipDisabledRequirements: true**，那会把 SkyUI 的 SKSE 过滤掉。

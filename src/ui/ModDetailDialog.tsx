@@ -95,8 +95,8 @@ ${SCOPE} code { padding: 0 0.25em; }
 
 /**
  * 调宿主 BBCode 渲染器。
- * - 宿主 2.8.2 的 util.bbcodeToReact 内部已经调过 preProcess（源码实证），不要再套一遍
- * - 万一某天这个 API 不见了/抛异常，退回纯文本，至少不出现空白弹窗
+ * - 宿主的 util.bbcodeToReact 内部已经调过 preProcess，不要再套一遍
+ * - 如果这个 API 不存在或抛异常，退回纯文本，至少不出现空白弹窗
  */
 function renderBBCode(text: string): any {
   const renderer = util === undefined ? undefined : util.bbcodeToReact;

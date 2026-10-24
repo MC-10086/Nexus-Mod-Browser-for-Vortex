@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 前置（Requirements）弹窗
  * ---------------------------------------------------------------------------
  * 纯展示组件：数据、判定、下载动作全部由页面传入。
@@ -40,7 +40,7 @@ export interface IRequirementsDecision {
   ignored: number[];
 }
 
-export interface IRequirementsDialogProps {
+interface IRequirementsDialogProps {
   data: IRequirementsDialogData;
   onDecision: (decision: IRequirementsDecision) => void;
   /** 单行下载；resolve(true) 表示已经开始（浏览器已打开 / 已进队列） */
