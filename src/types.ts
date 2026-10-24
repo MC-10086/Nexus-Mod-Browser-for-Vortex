@@ -5,6 +5,8 @@
  * 所有字段都是从 GraphQL 实测返回里挑出来的（见方案文档 §5.2 字段映射表）。
  */
 
+import type { Language } from "./i18n";
+
 /** 搜索列表里的一行（对应 GraphQL `ModsResult.nodes`） */
 export interface IModSummary {
   modId: number;
@@ -144,4 +146,6 @@ export interface INexusError extends Error {
 export interface INexusBrowserPrefs {
   /** 游戏域名 → 已手动安装的前置 Nexus mod id 列表 */
   manualRequirements: { [domain: string]: number[] };
+  /** 插件 UI 语言（只由用户在页头选择框里修改） */
+  language: Language;
 }

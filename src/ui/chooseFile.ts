@@ -13,6 +13,7 @@
  * 这样遮罩/ESC/焦点/多语言按钮全部白送，不需要自绘 UI。
  */
 
+import { t } from "../i18n";
 import { IModFile } from "../types";
 import { formatBytes, formatUnixDate } from "../util/format";
 import { describeFileCategory, isMainFile } from "../util/modFiles";
@@ -23,10 +24,10 @@ export function mainFilesOf(files: IModFile[]): IModFile[] {
 }
 
 /**
- * 文件选择弹窗的按钮文案。
+ * 文件选择弹窗的按钮文案保持英文。
  * ---------------------------------------------------------------------------
- * 宿主的 `showDialog` 会把 action label 过一遍 i18n（中文环境下 "Cancel" 会显示成「取消」），
- * 而插件其他按钮统一英文。加一个零宽空格让 i18next 找不到翻译 key，从而原样显示英文；
+ * 这是宿主原生对话框的一部分（属于"不好改"的部分）：标题/说明会跟随插件语言，
+ * 但原生按钮仍固定英文。零宽空格让 i18next 找不到翻译 key，从而原样显示英文；
  * 返回的 `result.action` 也带这个后缀，所以比较时必须用这两个常量。
  */
 export const CHOOSE_FILE_ACTION = {
@@ -86,9 +87,9 @@ export async function chooseModFile(
 
   const result = await api.showDialog(
     "question",
-    "选择要下载的文件",
+    t("filePicker.title"),
     {
-      text: `${modName} 有 ${mains.length} 个主文件，请选择要下载的那一个。`,
+      text: t("filePicker.text", { modName, count: mains.length }),
       choices: mains.map((file) => ({
         id: `file-${file.fileId}`,
         text: file.name,

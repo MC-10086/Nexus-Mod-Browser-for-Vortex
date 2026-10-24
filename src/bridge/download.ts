@@ -24,6 +24,7 @@
  *   - 一旦下载开始就不再计时（20 分钟的大文件也不会被打断）
  */
 
+import { t } from "../i18n";
 import { isPremium } from "../util/game";
 import { isNexusModInstalled } from "../util/mods";
 import { modFilePageUrl, openExternal } from "../util/openExternal";
@@ -171,7 +172,7 @@ async function installDownloaded(
         (err: any, modId?: string) => {
           if (err !== null && err !== undefined) {
             if (!isUserCanceled(err)) {
-              api.showErrorNotification?.("安装失败", err);
+              api.showErrorNotification?.(t("download.installFailed"), err);
             }
             resolve(undefined);
             return;
@@ -180,7 +181,7 @@ async function installDownloaded(
         },
       );
     } catch (err) {
-      api.showErrorNotification?.("安装失败", err);
+      api.showErrorNotification?.(t("download.installFailed"), err);
       resolve(undefined);
     }
   });
@@ -313,7 +314,7 @@ function watchDownloadRecord(options: IWatchOptions): Promise<WatchResult> {
               finish({ alreadyDownloaded: true });
               return;
             }
-            api.showErrorNotification?.("下载失败", err);
+            api.showErrorNotification?.(t("download.downloadFailed"), err);
             finish({});
           },
           onDownloadId: (downloadId?: string) => {
@@ -322,7 +323,7 @@ function watchDownloadRecord(options: IWatchOptions): Promise<WatchResult> {
           },
         });
       } catch (err) {
-        api.showErrorNotification?.("下载失败", err);
+        api.showErrorNotification?.(t("download.downloadFailed"), err);
         finish({});
       }
     }

@@ -18,6 +18,7 @@
 
 import * as React from "react";
 
+import { t } from "../i18n";
 import { IDlcRow, IRequirementRow, rowStatusLabel } from "../util/requirements";
 import { Button } from "./primitives";
 import { Icon } from "./icons";
@@ -82,11 +83,11 @@ function isIgnorable(row: IRequirementRow): boolean {
 
 function statusText(row: IRequirementRow, ignored: boolean): string {
   if (ignored) {
-    return "不再提醒";
+    return t("status.ignored");
   }
   // 取消"不再提醒"后，manual 行回到未安装状态
   if (row.kind === "manual") {
-    return "未安装";
+    return t("status.notInstalled");
   }
   return rowStatusLabel(row);
 }
@@ -191,14 +192,16 @@ export default function RequirementsDialog(props: IRequirementsDialogProps) {
 
   const missingCount = data.rows.filter((row) => row.kind === "missing").length;
   const actionLabel =
-    selected.length === 0 ? "Continue" : `Download selected (${selected.length})`;
+    selected.length === 0
+      ? t("common.continue")
+      : t("requirements.downloadSelected", { count: selected.length });
 
   return (
     <div
       className="nxm-modal nxm-modal-xl"
       role="dialog"
       aria-modal="true"
-      aria-label="Requirements"
+      aria-label={t("requirements.title")}
       data-testid="requirements-dialog"
     >
       <div className="nxm-modal-overlay" onClick={cancel} />
@@ -210,8 +213,8 @@ export default function RequirementsDialog(props: IRequirementsDialogProps) {
         <button
           type="button"
           className="nxm-modal-close"
-          title="Cancel"
-          aria-label="Cancel"
+          title={t("common.close")}
+          aria-label={t("common.close")}
           onClick={cancel}
         >
           <Icon name="close" size={5} />
@@ -219,11 +222,14 @@ export default function RequirementsDialog(props: IRequirementsDialogProps) {
 
         <div className="shrink-0" style={{ paddingRight: 40 }}>
           <p className="nxm-modal-title" style={{ marginBottom: 4 }}>
-            需要的前置 MOD
+            {t("requirements.title")}
           </p>
           <p className="text-body-xs text-neutral-subdued">
-            {data.modName} · {data.rows.length} 个前置
-            {missingCount > 0 ? `（${missingCount} 个未安装）` : ""}
+            {t("requirements.subtitle", {
+              modName: data.modName,
+              count: data.rows.length,
+              missing: missingCount,
+            })}
           </p>
         </div>
 
@@ -286,17 +292,17 @@ export default function RequirementsDialog(props: IRequirementsDialogProps) {
                       <div className="flex items-center gap-x-1">
                         <CheckBox
                           checked={isIgnored}
-                          label={`不再提醒 ${row.name}`}
+                          label={t("requirements.ignoreLabel", { name: row.name })}
                           onChange={() => toggleIgnored(row.modId)}
                         />
                         <button
                           type="button"
                           className="text-body-xs text-neutral-subdued"
                           style={{ cursor: "pointer" }}
-                          title="以后任何 MOD 需要这个前置时都跳过，不再提醒"
+                          title={t("requirements.ignoreHint")}
                           onClick={() => toggleIgnored(row.modId)}
                         >
-                          不再提醒
+                          {t("requirements.ignore")}
                         </button>
                       </div>
                     )
@@ -310,18 +316,18 @@ export default function RequirementsDialog(props: IRequirementsDialogProps) {
                     disabled={!canDownload}
                     title={
                       isIgnored
-                        ? "已设为不再提醒"
+                        ? t("requirements.ignoredTitle")
                         : row.kind === "installed"
-                          ? "Already installed via Vortex"
+                          ? t("requirements.installedTitle")
                           : canBeIgnored
                             ? isRequested
-                              ? "Already requested"
-                              : "Download this prerequisite"
-                            : "Cannot download automatically"
+                              ? t("requirements.requestedTitle")
+                              : t("requirements.downloadTitle")
+                            : t("requirements.cannotDownloadTitle")
                     }
                     onClick={() => void handleDownloadOne(row)}
                   >
-                    {isRequested ? "Requested" : "Download"}
+                    {isRequested ? t("common.requested") : t("common.download")}
                   </Button>
 
                   <Button
@@ -330,10 +336,10 @@ export default function RequirementsDialog(props: IRequirementsDialogProps) {
                     appearance="weak"
                     icon="openInNew"
                     disabled={row.url === undefined}
-                    title="Open on Nexus Mods"
+                    title={t("card.viewPageTitle")}
                     onClick={() => onViewPage(row)}
                   >
-                    View page
+                    {t("common.viewPage")}
                   </Button>
 
                   {row.modId > 0 && row.kind !== "otherGame"
@@ -343,10 +349,10 @@ export default function RequirementsDialog(props: IRequirementsDialogProps) {
                         brand="neutral"
                         appearance="weak"
                         icon="details"
-                        title="View details"
+                        title={t("card.detailsTitle")}
                         onClick={() => onDetails(row)}
                       >
-                        Details
+                        {t("common.details")}
                       </Button>
                     )
                     : null}
@@ -361,12 +367,12 @@ export default function RequirementsDialog(props: IRequirementsDialogProps) {
                 className="flex flex-col gap-y-1 border-t border-stroke-weak py-3"
                 data-testid="requirements-dlc"
               >
-                <p className="text-body-sm font-semibold">还需要以下 DLC</p>
+                <p className="text-body-sm font-semibold">{t("requirements.dlcTitle")}</p>
                 <p className="text-body-sm text-neutral-moderate">
                   {data.dlc.map((dlc) => dlc.name).join("、")}
                 </p>
                 <p className="text-body-xs text-neutral-subdued">
-                  插件无法检测 DLC 是否已安装，请自行确认。
+                  {t("requirements.dlcNote")}
                 </p>
               </div>
             )
@@ -377,14 +383,17 @@ export default function RequirementsDialog(props: IRequirementsDialogProps) {
           <div className="flex items-center gap-x-2">
             <CheckBox
               checked={allSelected}
-              label="Select all"
+              label={t("common.selectAll")}
               disabled={selectableRows.length === 0}
               onChange={toggleAll}
             />
             <p className="text-body-xs text-neutral-subdued">
-              全选
+              {t("common.selectAll")}
               {selectableRows.length > 0
-                ? `（已选 ${selected.length}/${selectableRows.length}）`
+                ? t("requirements.selected", {
+                    selected: selected.length,
+                    total: selectableRows.length,
+                  })
                 : ""}
             </p>
           </div>
@@ -393,13 +402,13 @@ export default function RequirementsDialog(props: IRequirementsDialogProps) {
             <Button
               brand="neutral"
               appearance="moderate"
-              title="Skip prerequisites and download the mod"
+              title={t("requirements.skipTitle")}
               onClick={skip}
             >
-              Skip
+              {t("common.skip")}
             </Button>
             <Button
-              title="Download the checked prerequisites, then the mod"
+              title={t("requirements.downloadSelectedTitle")}
               onClick={confirm}
               disabled={busy.length > 0}
             >

@@ -15,6 +15,7 @@ import {
   GAME_CACHE_TTL_MS,
   REQUIREMENTS_CACHE_TTL_MS,
 } from "../constants";
+import { t } from "../i18n";
 import {
   IModDetail,
   IModFile,
@@ -141,7 +142,7 @@ export class NexusService {
   public async modDetail(domain: string, modId: number): Promise<IModDetail> {
     const game = await this.resolveGame(domain);
     if (game === undefined) {
-      throw new Error(`游戏 "${domain}" 在 Nexus Mods 上没有对应页面。`);
+      throw new Error(t("error.noGamePage", { domain }));
     }
 
     return this.load<IModDetail>(`mod:${game.id}:${modId}`, CACHE_TTL_MS, async () => {
@@ -151,7 +152,7 @@ export class NexusService {
         this.getApiKey(),
       );
       if (data?.mod === null || data?.mod === undefined) {
-        throw new Error(`找不到 Mod ${modId}（可能已删除或隐藏）。`);
+        throw new Error(t("error.modNotFound", { modId }));
       }
       return data.mod;
     });
@@ -161,7 +162,7 @@ export class NexusService {
   public async modFiles(domain: string, modId: number): Promise<IModFile[]> {
     const game = await this.resolveGame(domain);
     if (game === undefined) {
-      throw new Error(`游戏 "${domain}" 在 Nexus Mods 上没有对应页面。`);
+      throw new Error(t("error.noGamePage", { domain }));
     }
 
     const files = await this.load<IModFile[]>(
@@ -190,7 +191,7 @@ export class NexusService {
   ): Promise<IModRequirementsInfo> {
     const game = await this.resolveGame(domain);
     if (game === undefined) {
-      throw new Error(`游戏 "${domain}" 在 Nexus Mods 上没有对应页面。`);
+      throw new Error(t("error.noGamePage", { domain }));
     }
 
     return this.load<IModRequirementsInfo>(
@@ -204,7 +205,7 @@ export class NexusService {
         );
         const mod = data?.mod;
         if (mod === null || mod === undefined) {
-          throw new Error(`找不到 Mod ${modId}（可能已删除或隐藏）。`);
+          throw new Error(t("error.modNotFound", { modId }));
         }
 
         const requirements = mod.modRequirements ?? {};

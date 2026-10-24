@@ -14,14 +14,17 @@
  */
 
 import { INexusBrowserPrefs } from "../types";
+import { isLanguage, Language } from "../i18n";
 
 export const PREFS_ACTIONS = {
   MARK_MANUAL_REQUIREMENT: "NEXUS_BROWSER_MARK_MANUAL_REQUIREMENT",
   UNMARK_MANUAL_REQUIREMENT: "NEXUS_BROWSER_UNMARK_MANUAL_REQUIREMENT",
+  SET_LANGUAGE: "NEXUS_BROWSER_SET_LANGUAGE",
 };
 
 export const PREFS_DEFAULTS: INexusBrowserPrefs = {
   manualRequirements: {},
+  language: "zh",
 };
 
 function withoutKey<T>(record: { [key: string]: T }, key: string): { [key: string]: T } {
@@ -77,6 +80,17 @@ export const prefsReducerSpec = {
             : { ...state.manualRequirements, [domain]: remaining },
       };
     },
+
+    [PREFS_ACTIONS.SET_LANGUAGE]: (
+      state: INexusBrowserPrefs,
+      payload: { language: Language },
+    ) => {
+      const language = payload?.language;
+      if (!isLanguage(language) || state.language === language) {
+        return state;
+      }
+      return { ...state, language };
+    },
   },
 
   defaults: PREFS_DEFAULTS,
@@ -92,6 +106,12 @@ export function manualRequirementIds(state: any, domain: string): number[] {
   return prefsSlice(state).manualRequirements?.[domain] ?? [];
 }
 
+/** 用户保存的插件语言；只有用户主动选择时才改变 */
+export function prefsLanguage(state: any): Language {
+  const value = prefsSlice(state).language;
+  return isLanguage(value) ? value : "zh";
+}
+
 export const prefsActions = {
   markManualRequirement: (domain: string, modId: number) => ({
     type: PREFS_ACTIONS.MARK_MANUAL_REQUIREMENT,
@@ -100,5 +120,9 @@ export const prefsActions = {
   unmarkManualRequirement: (domain: string, modId: number) => ({
     type: PREFS_ACTIONS.UNMARK_MANUAL_REQUIREMENT,
     payload: { domain, modId },
+  }),
+  setLanguage: (language: Language) => ({
+    type: PREFS_ACTIONS.SET_LANGUAGE,
+    payload: { language },
   }),
 };

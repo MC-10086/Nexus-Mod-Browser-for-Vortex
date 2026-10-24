@@ -16,6 +16,7 @@
  */
 
 import { NEXUS_BASE_URL, REQUIREMENTS_MAX_ROWS } from "../constants";
+import { t } from "../i18n";
 import { IModRequirementsInfo } from "../types";
 import { IInstalledNexusMod } from "./mods";
 
@@ -88,7 +89,9 @@ function buildRow(input: IBuildRowsInput, requirement: any): IRequirementRow | u
   const external = requirement?.externalRequirement === true;
   const modId = toModId(requirement?.modId);
   const isExternal = external || modId <= 0;
-  const name = decodeText(requirement?.modName) || (isExternal ? "站外组件" : `Mod ${modId}`);
+  const name =
+    decodeText(requirement?.modName) ||
+    (isExternal ? t("status.external") : t("requirements.unnamedMod", { modId }));
   const notes = decodeText(requirement?.notes) || undefined;
 
   if (!isExternal && modId === selfModId) {
@@ -244,21 +247,21 @@ export function diffIgnoredMarks(
   };
 }
 
-/** 行状态的中文标签（给 UI 用）；"不再提醒"由弹窗按本地状态覆盖成灰色文案 */
+/** 行状态标签（当前语言）；"不再提醒"由弹窗按本地状态覆盖成灰色文案 */
 export function rowStatusLabel(row: IRequirementRow): string {
   switch (row.kind) {
     case "missing":
-      return "未安装";
+      return t("status.notInstalled");
     case "manual":
-      return "不再提醒";
+      return t("status.ignored");
     case "installed":
       return row.localVersion !== undefined && row.localVersion.length > 0
-        ? `已安装 v${row.localVersion}`
-        : "已安装";
+        ? t("status.installedVersion", { version: row.localVersion })
+        : t("status.installed");
     case "external":
-      return "站外组件";
+      return t("status.external");
     case "otherGame":
-      return "其他游戏";
+      return t("status.otherGame");
     default:
       return "";
   }

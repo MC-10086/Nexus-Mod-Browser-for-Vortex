@@ -282,10 +282,18 @@ function render(state) {
   const pageNumbers = findAll(tree, (el) => hasClass(el, "nxm-pagination-number"));
   assert.ok(pageNumbers.length >= 3, "总数 131 > 24，应显示分页");
 
-  assert.ok(text.indexOf("Download") !== -1, "卡片按钮应为英文 Download");
-  assert.ok(text.indexOf("View page") !== -1, "卡片按钮应为英文 View page");
+  assert.ok(text.indexOf("下载") !== -1, "卡片按钮应显示当前语言「下载」");
+  assert.ok(text.indexOf("查看页面") !== -1, "卡片按钮应显示当前语言「查看页面」");
   assert.ok(text.indexOf("131 个结果") !== -1, "应显示结果数");
   assert.ok(text.indexOf("模组") !== -1, "应保留「模组」标签");
+
+  const languageSelects = findAll(tree, (el) => el.type === "select");
+  assert.strictEqual(languageSelects.length, 1, "页头应有语言选择框");
+  assert.strictEqual(languageSelects[0].props.value, "zh", "默认语言应为中文");
+  assert.ok(
+    textOf(languageSelects[0]).indexOf("English") !== -1,
+    "语言选择框应包含 English 选项",
+  );
   assert.strictEqual(text.indexOf("整合包"), -1, "不应再有「整合包」标签");
 
   const buttons = findAll(tree, (el) => el.type === "button");
@@ -313,11 +321,11 @@ function render(state) {
     },
   });
   const { text, tree } = render(state);
-  assert.ok(text.indexOf("Installed !") !== -1, "已安装的 MOD 应显示双语徽标");
+  assert.ok(text.indexOf("已安装 !") !== -1, "已安装的 MOD 应显示当前语言徽标");
   // 预热必须绑在 Download 按钮上，而不是整张卡片
   const downloadBtn = findAll(
     tree,
-    (el) => el.type === "button" && String((el.props && el.props.title) || "").indexOf("Download") === 0,
+    (el) => el.type === "button" && String((el.props && el.props.title) || "") === "下载并安装",
   )[0];
   assert.ok(downloadBtn, "应存在 Download 按钮");
   assert.strictEqual(typeof downloadBtn.props.onMouseEnter, "function", "Download 按钮应绑定 hover 预热");
@@ -388,7 +396,7 @@ const DETAIL = {
   const { tree, api } = render(makeState(slice));
   const detailsButton = findAll(
     tree,
-    (el) => el.type === "button" && textOf(el).trim() === "Details",
+    (el) => el.type === "button" && textOf(el).trim() === "详情",
   )[0];
   assert.ok(detailsButton, "卡片底部应有 Details 按钮");
   assert.strictEqual(typeof detailsButton.props.onClick, "function", "Details 按钮应可点击");
@@ -427,7 +435,7 @@ const DETAIL = {
     (el) => el.type === "button" && hasClass(el, "nxm-modal-close"),
   )[0];
   assert.ok(closeButton, "右上角应有宿主样式的关闭按钮");
-  assert.strictEqual(closeButton.props["aria-label"], "Close", "关闭按钮用英文 aria-label");
+  assert.strictEqual(closeButton.props["aria-label"], "关闭", "关闭按钮跟随当前语言");
   assert.strictEqual(typeof closeButton.props.onClick, "function", "点 × 应能关闭");
 
   const hero = findAll(
@@ -437,7 +445,7 @@ const DETAIL = {
   assert.strictEqual(hero.length, 1, "应显示主图（第一候选）");
 
   assert.ok(text.indexOf(MODS[0].name) !== -1, "应显示标题");
-  assert.ok(text.indexOf("1.28M downloads") !== -1, "应显示下载量元信息");
+  assert.ok(text.indexOf("1.28M 次下载") !== -1, "应显示下载量元信息");
   assert.ok(text.indexOf("v1.24") !== -1, "应显示版本");
 
   const body = findAll(
@@ -509,7 +517,7 @@ const DETAIL = {
   };
   const { tree, text } = render(makeState(slice));
   assert.ok(text.indexOf("超时") !== -1, "应显示详情错误文案");
-  const retry = findAll(tree, (el) => el.type === "button" && textOf(el).trim() === "Retry")[0];
+  const retry = findAll(tree, (el) => el.type === "button" && textOf(el).trim() === "重试")[0];
   assert.ok(retry, "应提供 Retry 按钮");
   assert.strictEqual(typeof retry.props.onClick, "function", "Retry 应可点击");
 }
@@ -603,7 +611,7 @@ const DETAIL = {
   // 每行都有 Download / View page
   const downloadButtons = findAll(
     tree,
-    (el) => el.type === "button" && textOf(el).trim() === "Download",
+    (el) => el.type === "button" && textOf(el).trim() === "下载",
   );
   assert.strictEqual(downloadButtons.length, 6, "每行都应有 Download 按钮");
   assert.deepStrictEqual(
@@ -614,7 +622,7 @@ const DETAIL = {
 
   const viewButtons = findAll(
     tree,
-    (el) => el.type === "button" && textOf(el).trim() === "View page",
+    (el) => el.type === "button" && textOf(el).trim() === "查看页面",
   );
   assert.strictEqual(viewButtons.length, 6, "每行都应有 View page 按钮");
   assert.strictEqual(
@@ -642,7 +650,7 @@ const DETAIL = {
     "手动标记的行默认勾上『不再提醒』",
   );
   assert.strictEqual(boxByLabel("不再提醒 SKSE").props["aria-checked"], false);
-  assert.strictEqual(boxByLabel("Select all").props["aria-checked"], true);
+  assert.strictEqual(boxByLabel("全选").props["aria-checked"], true);
 
   const text = textOf(tree).replace(/\s+/g, " ");
   assert.ok(text.indexOf("还需要以下 DLC") !== -1, "应提示 DLC");
@@ -650,7 +658,7 @@ const DETAIL = {
   assert.strictEqual(text.indexOf("当前是免费账号"), -1, "前置弹窗不应再显示免费账号说明");
   assert.strictEqual(text.indexOf("Mod manager download"), -1, "前置弹窗不应再显示免费下载说明");
   assert.ok(text.indexOf("不再提醒") !== -1, "应有『不再提醒』选项");
-  assert.ok(text.indexOf("Download selected (2)") !== -1, "主按钮应显示已选数量");
+  assert.ok(text.indexOf("下载所选（2）") !== -1, "主按钮应显示已选数量");
 
   // 弹窗底部不再有 Cancel（和右上角 × 重复）
   assert.strictEqual(
@@ -662,7 +670,7 @@ const DETAIL = {
   // 点主按钮：返回默认勾选的 2 项 + 已忽略的 999
   const primary = findAll(
     tree,
-    (el) => el.type === "button" && textOf(el).trim() === "Download selected (2)",
+    (el) => el.type === "button" && textOf(el).trim() === "下载所选（2）",
   )[0];
   primary.props.onClick();
   assert.strictEqual(decisions[0].kind, "download");
@@ -680,7 +688,7 @@ const DETAIL = {
   // Details：同一个游戏且有 Nexus modId 的行（SKSE / USSEP / PapyrusUtil / 已安装）
   const detailButtons = findAll(
     tree,
-    (el) => el.type === "button" && textOf(el).trim() === "Details",
+    (el) => el.type === "button" && textOf(el).trim() === "详情",
   );
   assert.strictEqual(detailButtons.length, 4, "站外/其他游戏行不应有 Details");
   detailButtons[0].props.onClick();
@@ -693,6 +701,45 @@ const DETAIL = {
   )[0];
   closeButton.props.onClick();
   assert.strictEqual(decisions[decisions.length - 1].kind, "cancel");
+}
+
+// ---------------------------------------------------------------------------
+// 场景 L：英文界面 + N 网内容原样显示
+// ---------------------------------------------------------------------------
+{
+  const i18n = require("../dist/i18n.js");
+  const ModTile = require("../dist/ui/ModTile.js").default;
+  const mod = {
+    modId: 999,
+    name: "N网名称",
+    summary: "N网简介",
+    category: "N网分类",
+    downloads: 1,
+    endorsements: 2,
+  };
+
+  i18n.setLanguage("en");
+  React.__resetHooks();
+  const tree = ModTile({
+    mod,
+    category: "N网分类",
+    installed: true,
+    onDownload: () => undefined,
+    onViewPage: () => undefined,
+    onDetails: () => undefined,
+  });
+  React.__runCleanups();
+
+  const text = textOf(tree).replace(/\s+/g, " ");
+  assert.ok(text.indexOf("Download") !== -1, "英文界面应显示 Download");
+  assert.ok(text.indexOf("View page") !== -1, "英文界面应显示 View page");
+  assert.ok(text.indexOf("Details") !== -1, "英文界面应显示 Details");
+  assert.ok(text.indexOf("Installed !") !== -1, "英文界面应显示 Installed !");
+  assert.ok(text.indexOf("N网名称") !== -1, "N 网 MOD 名称必须原样显示");
+  assert.ok(text.indexOf("N网简介") !== -1, "N 网简介必须原样显示");
+  assert.ok(text.indexOf("N网分类") !== -1, "N 网分类必须原样显示");
+
+  i18n.setLanguage("zh");
 }
 
 console.log("冒烟测试通过：");

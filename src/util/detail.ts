@@ -12,6 +12,7 @@
  *   裸 \n 会被浏览器折叠成空格，所以必须先归一化，否则长简介会变成一堵墙。
  */
 
+import { t } from "../i18n";
 import { IModDetail, IModSummary } from "../types";
 import { formatCount } from "./format";
 
@@ -75,7 +76,7 @@ export function detailBody(mod: IDetailSource): string {
   const source = detailBodySource(mod);
   const normalized = normalizeDetailText(source);
   // 只有 <br /> 之类"看起来有内容、渲染出来是空的"描述，也要回退到兜底文案
-  return normalized.length > 0 ? normalized : EMPTY_DESCRIPTION;
+  return normalized.length > 0 ? normalized : t("detail.empty");
 }
 
 /**
@@ -126,11 +127,11 @@ export function detailMeta(mod: IDetailSource): string {
   }
 
   if (typeof (mod as any).downloads === "number") {
-    parts.push(`${formatCount((mod as any).downloads)} downloads`);
+    parts.push(t("detail.downloads", { count: formatCount((mod as any).downloads) }));
   }
 
   if (typeof (mod as any).endorsements === "number") {
-    parts.push(`${formatCount((mod as any).endorsements)} endorsements`);
+    parts.push(t("detail.endorsements", { count: formatCount((mod as any).endorsements) }));
   }
 
   return parts.join("  ·  ");

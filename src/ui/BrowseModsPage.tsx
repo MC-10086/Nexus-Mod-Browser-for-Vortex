@@ -19,10 +19,11 @@ import { MainPage } from "@nexusmods/vortex-api";
 
 import { downloadForUser } from "../bridge/download";
 import { DEFAULT_PAGE_SIZE, SORT_OPTIONS } from "../constants";
+import { LANGUAGES, Language, setLanguage as setCurrentLanguage, t } from "../i18n";
 import { describeError } from "../nexus/client";
 import { getNexusService, resetNexusService } from "../nexus/index";
 import { actions, nexusBrowserSlice } from "../state/reducer";
-import { manualRequirementIds, prefsActions } from "../state/prefs";
+import { manualRequirementIds, prefsActions, prefsLanguage } from "../state/prefs";
 import { IModDetail, IModSummary } from "../types";
 import { activeGameId, gameName, isPremium, nexusDomain } from "../util/game";
 import { installedNexusModIds, installedNexusMods } from "../util/mods";
@@ -64,6 +65,16 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
   const sliceRef = React.useRef(nexusBrowserSlice(api.getState()));
   const [, forceRender] = React.useState(0);
   const [draft, setDraft] = React.useState(sliceRef.current.query);
+  /**
+   * 插件语言：
+   *   - 只在初始化时从持久化偏好读一次（没有则中文）；
+   *   - 之后只由页头选择框的用户操作改变，不跟随 Vortex 语言、不做自动探测。
+   */
+  const [language, setLanguageState] = React.useState<Language>(() => {
+    const initial = prefsLanguage(api.getState());
+    setCurrentLanguage(initial);
+    return initial;
+  });
   /** 已经在等待下载开始的 mod（**只用于 Premium**，防止重复 emit） */
   const pendingRef = React.useRef<number[]>([]);
   /**
@@ -217,6 +228,20 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
   };
 
   /**
+   * 语言切换：只在这里改变一次（模块 t + React state + 持久化偏好各一次）。
+   * 不发请求、不重置搜索、不订阅宿主语言。
+   */
+  const handleLanguageChange = (evt: any) => {
+    const next: Language = evt?.target?.value === "en" ? "en" : "zh";
+    if (next === language) {
+      return;
+    }
+    setCurrentLanguage(next);
+    setLanguageState(next);
+    api.store.dispatch(prefsActions.setLanguage(next));
+  };
+
+  /**
    * 打开详情弹窗（唯一入口）。
    * 特意做成一个独立函数：以后要换触发方式（点封面 / 双击 / 右键菜单），
    * 只改调用处，弹窗组件和状态层都不用动。
@@ -320,7 +345,7 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
     const currentDomain = nexusDomain(current, internalGameId);
 
     if (currentDomain === undefined || internalGameId === undefined) {
-      notify(api, "error", "无法下载：没有激活的游戏。");
+      notify(api, "error", t("notify.noGame"));
       return;
     }
 
@@ -401,7 +426,7 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
 
       const files = await getNexusService(api).modFiles(currentDomain, mod.modId);
       if (files.length === 0) {
-        notify(api, "error", "无法下载：该 MOD 没有可下载的文件。");
+        notify(api, "error", t("notify.noFiles"));
         return;
       }
 
@@ -451,27 +476,29 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
 
       if (outcome.canceled === true) {
         // 用户明确取消了，给个轻量提示并让它自动消失，不打扰
-        notify(api, "info", "已取消下载", 4000);
+        notify(api, "info", t("notify.cancelled"), 4000);
       } else if (outcome.alreadyDownloaded === true) {
-        notify(api, "info", `已在下载列表中：${file.name}`, 4000);
+        notify(api, "info", t("notify.alreadyInQueue", { name: file.name }), 4000);
       } else if (outcome.pending === true) {
         if (outcome.timedOut === true && !premium) {
           // 免费账号：没等到下载多半是网页关了/没点授权 —— 直接允许重来
-          notify(api, "info", "没有检测到下载：如果网页已关闭，直接再点一次 Download 即可。", 5000);
+          notify(api, "info", t("notify.pendingFree", { button: t("common.download") }), 5000);
         } else {
-          notify(api, "info", "下载仍在进行，可在左侧「下载」页查看进度。", 5000);
+          notify(api, "info", t("notify.pending"), 5000);
         }
       } else if (outcome.downloadId !== undefined) {
         const installed = outcome.installedModId !== undefined;
         notify(
           api,
           installed ? "success" : "info",
-          installed ? `已下载并安装：${mod.name}` : `已加入下载队列：${mod.name}`,
+          installed
+            ? t("notify.installed", { name: mod.name })
+            : t("notify.queued", { name: mod.name }),
           5000,
         );
       }
     } catch (err) {
-      notify(api, "error", `下载失败：${describeError(err as any)}`);
+      notify(api, "error", t("notify.downloadFailed", { error: describeError(err as any) }));
     } finally {
       pendingRef.current = pendingRef.current.filter((id) => id !== mod.modId);
       if (attempt !== undefined && attemptRef.current[mod.modId] === attempt) {
@@ -488,7 +515,7 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
     if (domain === undefined) {
       return (
         <div className="py-16 text-center text-body-sm text-neutral-moderate">
-          请先在 Games 页面激活一个游戏。
+          {t("page.activateGame")}
         </div>
       );
     }
@@ -523,12 +550,12 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
                     .catch(() => undefined);
                 }}
               >
-                Log in
+                {t("common.login")}
               </Button>
             )
             : (
               <Button brand="neutral" appearance="moderate" onClick={handleRefresh} icon="refresh">
-                重试
+                {t("common.retry")}
               </Button>
             )}
         </div>
@@ -540,8 +567,8 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
         <div className="py-16 text-center">
           <p className="mb-3 text-body-sm text-neutral-moderate">
             {slice.query.length > 0
-              ? `没有找到与「${slice.query}」匹配的 MOD。`
-              : "这个游戏暂时没有取到结果。"}
+              ? t("page.emptyQuery", { query: slice.query })
+              : t("page.emptyNoResults")}
           </p>
           <Button
             brand="neutral"
@@ -549,7 +576,7 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
             icon="openInNew"
             onClick={() => openExternal(gameModsUrl(domain))}
           >
-            在网站上浏览
+            {t("page.browseSite")}
           </Button>
         </div>
       );
@@ -588,7 +615,7 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
     <MainPage id="nexus-mod-browser-page">
       <MainPage.Body className="h-full overflow-y-auto pt-6" ref={scrollRef}>
         <TabBar className="overflow-clip pl-6">
-          <TabButton name="模组" count={slice.totalCount} selected />
+          <TabButton name={t("page.tab")} count={slice.totalCount} selected />
         </TabBar>
 
         <div className="space-y-3 p-6">
@@ -596,8 +623,12 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
             <div className="max-w-60 flex-1">
               <input
                 className="nxm-input w-full"
-                placeholder={domain === undefined ? "先激活一个游戏…" : `在 ${gameName(state, gameId)} 中搜索…`}
-                aria-label="搜索 MOD"
+                placeholder={
+                  domain === undefined
+                    ? t("page.activatePlaceholder")
+                    : t("page.searchPlaceholder", { game: gameName(state, gameId) })
+                }
+                aria-label={t("common.search")}
                 value={draft}
                 disabled={domain === undefined}
                 onChange={(evt: any) => setDraft(evt.target.value)}
@@ -609,8 +640,8 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
               brand="neutral"
               appearance="moderate"
               icon="magnify"
-              ariaLabel="搜索"
-              title="搜索"
+              ariaLabel={t("common.search")}
+              title={t("common.search")}
               disabled={domain === undefined}
             />
           </form>
@@ -621,19 +652,41 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
                 brand="neutral"
                 appearance="moderate"
                 icon="refresh"
-                ariaLabel="刷新"
-                title="刷新"
+                ariaLabel={t("common.refresh")}
+                title={t("common.refresh")}
                 disabled={domain === undefined || slice.loading}
                 onClick={handleRefresh}
               />
-              <p className="text-body-sm text-translucent-moderate">{slice.totalCount} 个结果</p>
+              <p className="text-body-sm text-translucent-moderate">
+                {t("page.results", { count: slice.totalCount })}
+              </p>
             </div>
 
-            <SortMenu
-              options={SORT_OPTIONS.map((option) => ({ id: option.id, label: option.label }))}
-              value={slice.sort}
-              onChange={(id) => api.store.dispatch(actions.setSort(id))}
-            />
+            <div className="flex items-center gap-x-2">
+              <select
+                className="nxm-input"
+                style={{ width: 110 }}
+                value={language}
+                aria-label={t("language.label")}
+                title={t("language.label")}
+                onChange={handleLanguageChange}
+              >
+                {LANGUAGES.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+
+              <SortMenu
+                options={SORT_OPTIONS.map((option) => ({
+                  id: option.id,
+                  label: t(option.labelKey),
+                }))}
+                value={slice.sort}
+                onChange={(id) => api.store.dispatch(actions.setSort(id))}
+              />
+            </div>
           </div>
 
           {renderBody()}

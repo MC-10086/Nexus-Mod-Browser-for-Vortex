@@ -5,6 +5,8 @@
  * 改动时只需要动这一个文件。
  */
 
+import type { MessageKey } from "./i18n";
+
 /** Nexus Mods GraphQL v2 端点（必须是 POST，GET 会 404） */
 export const GRAPHQL_ENDPOINT = "https://api.nexusmods.com/v2/graphql";
 
@@ -75,13 +77,13 @@ export const ACTIONS = {
 };
 
 /**
- * 排序选项：field 直接对应 GraphQL 的 ModsSort 字段
- * 文案采用「English（中文）」格式，和 Nexus 站点的英文术语对齐，同时方便中文用户。
+ * 排序选项：field 直接对应 GraphQL 的 ModsSort 字段。
+ * labelKey 指向 i18n 字典；中文/英文不再拼在一起，由当前语言决定显示哪一个。
  */
-export const SORT_OPTIONS: Array<{ id: string; label: string; field: string }> = [
-  { id: "relevance", label: "Relevance（相关度）", field: "relevance" },
-  { id: "endorsements", label: "Most Endorsed（点赞最多）", field: "endorsements" },
-  { id: "downloads", label: "Most Downloaded（下载最多）", field: "downloads" },
-  { id: "updatedAt", label: "Recently Updated（最近更新）", field: "updatedAt" },
-  { id: "createdAt", label: "Recently Listed（最新发布）", field: "createdAt" },
+export const SORT_OPTIONS: Array<{ id: string; labelKey: MessageKey; field: string }> = [
+  { id: "relevance", labelKey: "sort.relevance", field: "relevance" },
+  { id: "endorsements", labelKey: "sort.endorsements", field: "endorsements" },
+  { id: "downloads", labelKey: "sort.downloads", field: "downloads" },
+  { id: "updatedAt", labelKey: "sort.updatedAt", field: "updatedAt" },
+  { id: "createdAt", labelKey: "sort.createdAt", field: "createdAt" },
 ];

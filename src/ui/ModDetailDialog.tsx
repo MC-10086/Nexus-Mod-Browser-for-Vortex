@@ -23,6 +23,7 @@ import * as React from "react";
 
 import { Image, util } from "@nexusmods/vortex-api";
 
+import { t } from "../i18n";
 import { IModDetail, IModSummary } from "../types";
 import { detailBody, detailImageSources, detailMeta } from "../util/detail";
 import { Button } from "./primitives";
@@ -139,7 +140,7 @@ export default function ModDetailDialog(props: IModDetailDialogProps) {
   // 详情优先；没有详情时用列表数据顶着（标题/主图/元信息先出来）
   const mod: any = detail ?? summary;
   const name: string =
-    (mod !== undefined && mod !== null ? mod.name : undefined) ?? title ?? "Mod details";
+    (mod !== undefined && mod !== null ? mod.name : undefined) ?? title ?? t("detail.fallbackTitle");
   const meta = detailMeta(mod);
 
   /**
@@ -190,8 +191,8 @@ export default function ModDetailDialog(props: IModDetailDialogProps) {
         <button
           type="button"
           className="nxm-modal-close"
-          title="Close"
-          aria-label="Close"
+          title={t("common.close")}
+          aria-label={t("common.close")}
           onClick={onClose}
         >
           <Icon name="close" size={5} />
@@ -239,7 +240,7 @@ export default function ModDetailDialog(props: IModDetailDialogProps) {
                         icon="refresh"
                         onClick={onRetry}
                       >
-                        Retry
+                        {t("common.retry")}
                       </Button>
                     </div>
                   )

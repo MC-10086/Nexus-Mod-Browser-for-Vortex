@@ -1199,7 +1199,7 @@ async function main() {
         downloads: 1284000,
         endorsements: 21800,
       }),
-      "Stracker  ·  v1.24  ·  1.28M downloads  ·  21.8K endorsements",
+      "Stracker  ·  v1.24  ·  1.28M 次下载  ·  21.8K 点赞",
     );
     assert.strictEqual(detailUtil.detailMeta({ author: "Solo" }), "Solo");
     assert.strictEqual(detailUtil.detailMeta({}), "");
@@ -1444,6 +1444,55 @@ async function main() {
     assert.strictEqual(data.dlc.length, 1);
     assert.strictEqual(data.dlc[0].name, "Saints & Seducers");
     assert.strictEqual(data.freeAccount, undefined, "弹窗数据不再带免费账号字段");
+  });
+
+  // -------------------------------------------------------------------------
+  // 12) 多语言
+  // -------------------------------------------------------------------------
+  console.log("\n[12] 多语言");
+
+  const i18n = require("../dist/i18n.js");
+  const prefsUtil = require("../dist/state/prefs.js");
+  const { SORT_OPTIONS } = require("../dist/constants.js");
+
+  test("i18n：默认中文、英文切换、占位符替换", () => {
+    i18n.setLanguage("zh");
+    assert.strictEqual(i18n.getLanguage(), "zh");
+    assert.strictEqual(i18n.t("common.download"), "下载");
+    assert.strictEqual(i18n.t("page.results", { count: 3 }), "3 个结果");
+
+    i18n.setLanguage("en");
+    assert.strictEqual(i18n.getLanguage(), "en");
+    assert.strictEqual(i18n.t("common.download"), "Download");
+    assert.strictEqual(i18n.t("page.results", { count: 3 }), "3 results");
+    assert.ok(
+      i18n.t("filePicker.text", { modName: "Test", count: 2 }).indexOf("Test") >= 0,
+      "占位符应被替换",
+    );
+    i18n.setLanguage("zh");
+  });
+
+  test("语言偏好：默认中文，SET_LANGUAGE 只在变化时产生新 state", () => {
+    assert.strictEqual(prefsUtil.prefsLanguage({}), "zh");
+    const reducer = prefsUtil.prefsReducerSpec.reducers[prefsUtil.PREFS_ACTIONS.SET_LANGUAGE];
+    const next = reducer({ manualRequirements: {}, language: "zh" }, { language: "en" });
+    assert.strictEqual(next.language, "en");
+    const same = reducer(next, { language: "en" });
+    assert.strictEqual(same, next, "相同语言不应产生新 state");
+  });
+
+  test("排序选项拆成单语 key，不再中英混排", () => {
+    assert.strictEqual(SORT_OPTIONS.length, 5);
+    for (const option of SORT_OPTIONS) {
+      assert.strictEqual(typeof option.labelKey, "string");
+      assert.strictEqual(option.label, undefined);
+    }
+
+    i18n.setLanguage("zh");
+    assert.strictEqual(i18n.t(SORT_OPTIONS[0].labelKey), "相关度");
+    i18n.setLanguage("en");
+    assert.strictEqual(i18n.t(SORT_OPTIONS[0].labelKey), "Relevance");
+    i18n.setLanguage("zh");
   });
 
   console.log(`\n通过 ${passed} 项。`);

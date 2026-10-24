@@ -11,11 +11,12 @@
  */
 
 import { IModFile } from "../types";
+import { MessageKey, t } from "../i18n";
 
 export interface IFileCategoryInfo {
   /** 规范化的枚举名 */
   name: string;
-  /** 给用户看的中文标签 */
+  /** 给用户看的当前语言标签 */
   label: string;
 }
 
@@ -30,14 +31,14 @@ const BY_ID: { [id: number]: string } = {
   7: "ARCHIVED",
 };
 
-const LABELS: { [name: string]: string } = {
-  MAIN: "主文件",
-  UPDATE: "更新包",
-  OPTIONAL: "可选文件",
-  OLD_VERSION: "旧版本",
-  MISCELLANEOUS: "其他",
-  REMOVED: "已移除",
-  ARCHIVED: "已归档",
+const LABEL_KEYS: { [name: string]: MessageKey } = {
+  MAIN: "category.main",
+  UPDATE: "category.update",
+  OPTIONAL: "category.optional",
+  OLD_VERSION: "category.oldVersion",
+  MISCELLANEOUS: "category.misc",
+  REMOVED: "category.removed",
+  ARCHIVED: "category.archived",
 };
 
 /** 把数字或字符串统一成枚举名；无法识别时返回 undefined */
@@ -47,12 +48,12 @@ export function categoryNameOf(category: number | string | undefined | null): st
   }
   if (typeof category === "string") {
     const upper = category.toUpperCase();
-    return LABELS[upper] !== undefined ? upper : undefined;
+    return LABEL_KEYS[upper] !== undefined ? upper : undefined;
   }
   return BY_ID[category];
 }
 
-/** 分类信息（名称 + 中文标签） */
+/** 分类信息（名称 + 当前语言标签） */
 export function describeFileCategory(
   category: number | string | undefined | null,
 ): IFileCategoryInfo | undefined {
@@ -60,7 +61,7 @@ export function describeFileCategory(
   if (name === undefined) {
     return undefined;
   }
-  return { name, label: LABELS[name] };
+  return { name, label: t(LABEL_KEYS[name]) };
 }
 
 /** 是否主文件（兼容 1 与 "MAIN" 两种返回） */

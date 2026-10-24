@@ -12,6 +12,7 @@
 import * as https from "https";
 
 import { GRAPHQL_ENDPOINT, REQUEST_TIMEOUT_MS } from "../constants";
+import { t } from "../i18n";
 import { INexusError } from "../types";
 
 /**
@@ -31,16 +32,16 @@ function toNexusError(message: string, errors?: any[]): INexusError {
 export function describeError(err: INexusError): string {
   switch (err.code) {
     case "UNAUTHORIZED":
-      return "需要登录 Nexus Mods 才能执行该操作。请在 Vortex 右上角登录后重试。";
+      return t("error.login");
     case "ADULT_CONTENT_BLOCKED":
-      return "该内容被 Nexus 的成人内容偏好拦截。请到 Nexus 网站设置中调整 Adult Content 选项。";
+      return t("error.adult");
     case "NOT_FOUND":
-      return "找不到该资源（可能已被删除或隐藏）。";
+      return t("error.notFound");
     case "undefinedField":
     case "argumentNotAccepted":
-      return `Nexus API 拒绝了该查询（${err.code}）。可能是插件与 API 版本不匹配，请更新插件。`;
+      return t("error.schema", { code: err.code });
     default:
-      return err.message || "请求 Nexus API 失败";
+      return err.message || t("error.generic");
   }
 }
 
@@ -84,7 +85,7 @@ function postJson(body: string, apiKey: string | undefined): Promise<IRawRespons
     request.on("error", (err: any) => reject(err));
     request.setTimeout(REQUEST_TIMEOUT_MS, () => {
       request.destroy();
-      reject(toNexusError("请求 Nexus API 超时，请检查网络后重试。"));
+      reject(toNexusError(t("error.timeout")));
     });
     request.write(body);
     request.end();
@@ -114,33 +115,37 @@ export async function graphql<T>(
     if (err instanceof Error && err.name === "NexusError") {
       throw err;
     }
-    throw toNexusError(`无法连接 api.nexusmods.com：${(err as Error)?.message ?? err}`);
+    throw toNexusError(
+      t("error.connect", { message: (err as Error)?.message ?? String(err) }),
+    );
   }
 
   if (raw.status < 200 || raw.status >= 300) {
     // 429 单独提示，方便用户理解（Nexus 有限流）
     if (raw.status === 429) {
-      throw toNexusError("请求过于频繁（HTTP 429），请稍后再试。");
+      throw toNexusError(t("error.rateLimit"));
     }
     if (raw.status === 403) {
-      throw toNexusError("Nexus 拒绝了该请求（HTTP 403），可能是 API Key 失效或权限不足。");
+      throw toNexusError(t("error.forbidden"));
     }
-    throw toNexusError(`Nexus API 返回 HTTP ${raw.status}：${raw.text.slice(0, 300)}`);
+    throw toNexusError(
+      t("error.http", { status: raw.status, body: raw.text.slice(0, 300) }),
+    );
   }
 
   let parsed: any;
   try {
     parsed = JSON.parse(raw.text);
   } catch {
-    throw toNexusError(`Nexus API 返回了非 JSON 内容：${raw.text.slice(0, 200)}`);
+    throw toNexusError(t("error.nonJson", { body: raw.text.slice(0, 200) }));
   }
 
   if (parsed.errors && parsed.errors.length > 0) {
-    throw toNexusError(parsed.errors[0]?.message ?? "GraphQL 错误", parsed.errors);
+    throw toNexusError(parsed.errors[0]?.message ?? t("error.generic"), parsed.errors);
   }
 
   if (parsed.data === undefined || parsed.data === null) {
-    throw toNexusError("Nexus API 返回了空数据。");
+    throw toNexusError(t("error.empty"));
   }
 
   return parsed.data as T;

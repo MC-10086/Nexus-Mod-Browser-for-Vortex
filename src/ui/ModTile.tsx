@@ -12,6 +12,7 @@
 
 import * as React from "react";
 
+import { t } from "../i18n";
 import { IModSummary } from "../types";
 import { formatCount } from "../util/format";
 import { Icon, IconName } from "./icons";
@@ -106,7 +107,7 @@ export default function ModTile(props: IModTileProps) {
               ? (
                 <>
                   {category !== undefined ? <span className="nxm-bullet" /> : null}
-                  <p className="text-body-sm text-danger-strong">Adult</p>
+                  <p className="text-body-sm text-danger-strong">{t("card.adult")}</p>
                 </>
               )
               : null}
@@ -134,9 +135,9 @@ export default function ModTile(props: IModTileProps) {
           onMouseEnter={onPrefetch}
           onFocus={onPrefetch}
           disabled={busy === true}
-          title="Download and install"
+          title={t("card.downloadTitle")}
         >
-          {busy === true ? "Downloading…" : "Download"}
+          {busy === true ? t("common.downloading") : t("common.download")}
         </Button>
 
         <Button
@@ -145,9 +146,9 @@ export default function ModTile(props: IModTileProps) {
           appearance="weak"
           icon="openInNew"
           onClick={onViewPage}
-          title="Open on Nexus Mods"
+          title={t("card.viewPageTitle")}
         >
-          View page
+          {t("common.viewPage")}
         </Button>
 
         {onDetails !== undefined
@@ -158,9 +159,9 @@ export default function ModTile(props: IModTileProps) {
               appearance="weak"
               icon="details"
               onClick={onDetails}
-              title="Show mod details"
+              title={t("card.detailsTitle")}
             >
-              Details
+              {t("common.details")}
             </Button>
           )
           : null}
@@ -169,9 +170,9 @@ export default function ModTile(props: IModTileProps) {
           ? (
             <p
               className="ml-auto text-body-xs text-success-strong"
-              title="This mod is already installed"
+              title={t("card.installedTitle")}
             >
-              Installed !
+              {t("card.installed")}
             </p>
           )
           : null}

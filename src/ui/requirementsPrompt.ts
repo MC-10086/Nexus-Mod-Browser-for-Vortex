@@ -14,6 +14,7 @@
 
 import { downloadForUser } from "../bridge/download";
 import { REQUIREMENTS_PROMPT_TIMEOUT_MS } from "../constants";
+import { t } from "../i18n";
 import { getNexusService } from "../nexus/index";
 import {
   buildDlcRows,
@@ -125,12 +126,12 @@ export async function startRequirementDownload(
     const files = await getNexusService(api).modFiles(context.domain, row.modId);
     file = pickPrimaryFile(files);
   } catch {
-    notify(api, "error", `无法获取前置 ${row.name} 的文件列表。`, 6000);
+    notify(api, "error", t("notify.reqFilesFailed", { name: row.name }), 6000);
     return false;
   }
 
   if (file === undefined) {
-    notify(api, "error", `前置 ${row.name} 没有可下载的文件。`, 6000);
+    notify(api, "error", t("notify.reqNoFile", { name: row.name }), 6000);
     return false;
   }
 
@@ -145,7 +146,7 @@ export async function startRequirementDownload(
     }).catch(() => undefined);
     return true;
   } catch {
-    notify(api, "error", `前置下载失败：${row.name}`, 6000);
+    notify(api, "error", t("notify.reqDownloadFailed", { name: row.name }), 6000);
     return false;
   }
 }
@@ -250,17 +251,22 @@ export function notifyRequirementSummary(
   if (result.started > 0) {
     parts.push(
       options.freeAccount
-        ? `已在浏览器打开 ${result.started} 个前置页面`
-        : `已开始下载 ${result.started} 个前置`,
+        ? t("notify.reqSummaryFree", { count: result.started })
+        : t("notify.reqSummaryPremium", { count: result.started }),
     );
   }
   if (result.failed > 0) {
-    parts.push(`${result.failed} 个未能自动下载，可用 View page 手动处理`);
+    parts.push(
+      t("notify.reqSummaryFailed", {
+        count: result.failed,
+        button: t("common.viewPage"),
+      }),
+    );
   }
 
   const suffix = options.freeAccount && result.started > 0
-    ? "（每个页面需点一次 Mod manager download）"
+    ? t("notify.reqSummarySuffix")
     : "";
 
-  notify(api, "info", parts.join("；") + suffix, 7000);
+  notify(api, "info", parts.join(t("common.listSeparator")) + suffix, 7000);
 }

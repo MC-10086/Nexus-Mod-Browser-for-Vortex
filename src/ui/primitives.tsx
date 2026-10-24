@@ -12,6 +12,7 @@
 
 import * as React from "react";
 
+import { t } from "../i18n";
 import { ButtonIcon, Icon, IconName } from "./icons";
 
 // ---------------------------------------------------------------------------
@@ -175,8 +176,8 @@ export function Pagination(props: IPaginationProps) {
         <button
           type="button"
           className="nxm-pagination-arrow"
-          aria-label="上一页"
-          title="上一页"
+          aria-label={t("pagination.prev")}
+          title={t("pagination.prev")}
           disabled={totalPages < 1 || currentPage === 1}
           onClick={() => onChange(Math.max(1, currentPage - 1))}
         >
@@ -197,7 +198,7 @@ export function Pagination(props: IPaginationProps) {
                 .filter(Boolean)
                 .join(" ")}
               aria-current={currentPage === page ? "true" : "false"}
-              aria-label={`第 ${page} 页`}
+              aria-label={t("pagination.page", { page })}
               onClick={() => onChange(page)}
             >
               {page}
@@ -208,8 +209,8 @@ export function Pagination(props: IPaginationProps) {
         <button
           type="button"
           className="nxm-pagination-arrow"
-          aria-label="下一页"
-          title="下一页"
+          aria-label={t("pagination.next")}
+          title={t("pagination.next")}
           disabled={totalPages < 1 || currentPage === totalPages}
           onClick={() => onChange(Math.min(totalPages, currentPage + 1))}
         >
@@ -254,7 +255,7 @@ export function SortMenu(props: ISortMenuProps) {
         brand="neutral"
         appearance="moderate"
         onClick={() => setOpen(!open)}
-        title="排序方式"
+        title={t("sort.title")}
         style={{ width: WIDTH, justifyContent: "flex-start" }}
         contentClassName="flex w-full items-center justify-between gap-x-1"
       >
