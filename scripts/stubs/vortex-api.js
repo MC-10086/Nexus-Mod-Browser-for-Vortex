@@ -39,6 +39,19 @@ function Image(props) {
   return React.createElement("img", { ...rest, src: srcs[0] });
 }
 
+/** 宿主 ZoomableImage 的替身：真实实现点击后全屏，这里只保留 wrapper + img 结构 */
+function ZoomableImage(props) {
+  return React.createElement(
+    "div",
+    { className: props.className },
+    React.createElement("img", {
+      className: "zoomable-image",
+      src: props.url,
+      "data-zoomable": "true",
+    }),
+  );
+}
+
 module.exports = {
   MainPage,
   MainContext: {},
@@ -47,6 +60,7 @@ module.exports = {
   Table: (props) => element("div", "", props),
   Icon: (props) => element("span", "", props),
   Image,
+  ZoomableImage,
   util: {
     bbcodeToReact: (input) => bbcodeToReact(input, React),
     bbcodePreProcess: (input) => String(input === undefined || input === null ? "" : input),

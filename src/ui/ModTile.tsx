@@ -12,6 +12,8 @@
 
 import * as React from "react";
 
+import { ZoomableImage } from "@nexusmods/vortex-api";
+
 import { t } from "../i18n";
 import { IModSummary } from "../types";
 import { formatCount } from "../util/format";
@@ -28,14 +30,9 @@ export interface IModTileProps {
   busy?: boolean;
   /** 鼠标移入 Download 按钮时预热文件列表（让第一次点下载不用等网络） */
   onPrefetch?: () => void;
-  onOpen?: () => void;
   onDownload?: () => void;
   onViewPage?: () => void;
-  /**
-   * 打开详情弹窗。
-   * 故意做成可选 prop：入口不要写死在卡片里 —— 以后想换成「点封面打开详情」，
-   * 只要不传 onDetails、把 onOpen 指到同一个 handler 即可，弹窗与状态层都不用动。
-   */
+  /** 打开详情弹窗（可选：不传就不渲染 Details 按钮） */
   onDetails?: () => void;
 }
 
@@ -49,8 +46,7 @@ function Stat(props: { icon: IconName; children: any }) {
 }
 
 export default function ModTile(props: IModTileProps) {
-  const { mod, category, installed, busy, onPrefetch, onOpen, onDownload, onViewPage, onDetails } =
-    props;
+  const { mod, category, installed, busy, onPrefetch, onDownload, onViewPage, onDetails } = props;
   const author = mod.uploader?.name ?? mod.author ?? "unknown";
 
   return (
@@ -61,29 +57,19 @@ export default function ModTile(props: IModTileProps) {
       <div className="flex grow items-start gap-x-3.5 p-3">
         {/* 左列：封面 +（可选）已安装标记 */}
         <div className="flex w-full max-w-35 shrink-0 flex-col gap-y-1">
-          <div
-            className="nxm-image nxm-image-mod w-full rounded-xs"
-            onClick={onOpen}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(evt: any) => {
-              if (evt.key === "Enter" || evt.key === " ") {
-                onOpen?.();
-              }
-            }}
-          >
-            {mod.pictureUrl !== undefined && mod.pictureUrl !== ""
-              ? (
-                <img
-                  className="nxm-image-media nxm-image-media-cover"
-                  src={mod.pictureUrl}
-                  alt=""
-                  loading="lazy"
-                  draggable={false}
-                />
-              )
-              : <Icon name="imageBroken" size={6} className="text-neutral-subdued" />}
-          </div>
+          {mod.pictureUrl !== undefined && mod.pictureUrl !== ""
+            ? (
+              <div className="nxm-image nxm-image-mod w-full rounded-xs mod-cover-zoom">
+                {ZoomableImage !== undefined
+                  ? <ZoomableImage className="zoomable-image-wrap w-full" url={mod.pictureUrl} />
+                  : <img className="zoomable-image" src={mod.pictureUrl} alt="" loading="lazy" />}
+              </div>
+            )
+            : (
+              <div className="nxm-image nxm-image-mod w-full rounded-xs">
+                <Icon name="imageBroken" size={6} className="text-neutral-subdued" />
+              </div>
+            )}
         </div>
 
         <div className="flex min-w-0 grow flex-col gap-y-1.5">

@@ -21,7 +21,7 @@
 
 import * as React from "react";
 
-import { Image, util } from "@nexusmods/vortex-api";
+import { ZoomableImage, util } from "@nexusmods/vortex-api";
 
 import { t } from "../i18n";
 import { IModDetail, IModSummary } from "../types";
@@ -72,6 +72,14 @@ ${SCOPE} blockquote {
   margin: 0.6em 0; padding-left: 0.8em;
   border-left: 2px solid var(--color-stroke-weak);
   color: var(--color-neutral-subdued);
+}
+${SCOPE} .detail-main-zoom .zoomable-image {
+  display: block;
+  width: 100%;
+  max-width: none;
+  max-height: 40vh;
+  object-fit: contain;
+  margin: 0 auto;
 }
 ${SCOPE} img { border-radius: var(--radius-xs); }
 ${SCOPE} hr { margin: 1em 0; border-color: var(--color-stroke-weak); }
@@ -144,10 +152,9 @@ export default function ModDetailDialog(props: IModDetailDialogProps) {
   const meta = detailMeta(mod);
 
   /**
-   * 主图控件：优先用宿主的 Image（带 srcs 多级回退）。
-   * 万一某个 Vortex 版本不再导出它，退化成普通 <img>（丢掉回退能力，但页面不会整个崩掉）。
+   * 主图控件：用宿主自带 ZoomableImage（点击全屏放大、再点关闭）。
+   * 单一 url 没有多级回退；若宿主版本没有这个导出，退回普通 img。
    */
-  const HostImage: any = Image;
   const imageProps: any = {
     alt: "",
     className: "rounded-xs",
@@ -217,11 +224,11 @@ export default function ModDetailDialog(props: IModDetailDialogProps) {
               // 用宿主的 nxm-image 负责居中/圆角裁切，但把底色改透明：
               // 主图按 max-height 等比缩放，两侧留白不该出现一块灰色方块。
               <div
-                className="nxm-image w-full shrink-0 rounded-xs"
+                className="nxm-image w-full shrink-0 rounded-xs detail-main-zoom"
                 style={{ backgroundColor: "transparent" }}
               >
-                {HostImage !== undefined
-                  ? <HostImage srcs={sources} {...imageProps} />
+                {ZoomableImage !== undefined
+                  ? <ZoomableImage className="detail-main-zoom w-full" url={sources[0]} />
                   : <img src={sources[0]} {...imageProps} />}
               </div>
             )

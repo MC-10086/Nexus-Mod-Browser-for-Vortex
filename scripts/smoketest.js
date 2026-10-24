@@ -131,6 +131,7 @@ const MODS = [
     downloads: 1284000,
     endorsements: 21800,
     uploader: { name: "Stracker" },
+    pictureUrl: "https://staticdelivery.nexusmods.com/thumb1.png",
     adultContent: false,
   },
   {
@@ -278,6 +279,13 @@ function render(state) {
 
   const tiles = findAll(tree, (el) => el.props && el.props["data-testid"] === "mod-tile");
   assert.strictEqual(tiles.length, 3, "应渲染 3 张卡片");
+
+  const zoomCovers = findAll(
+    tree,
+    (el) => el.type === "img" && el.props && el.props["data-zoomable"] === "true",
+  );
+  assert.ok(zoomCovers.length >= 1, "卡片封面应使用 ZoomableImage");
+  assert.strictEqual(zoomCovers[0].props.onClick, undefined, "封面不应再跳 N 网");
 
   const pageNumbers = findAll(tree, (el) => hasClass(el, "nxm-pagination-number"));
   assert.ok(pageNumbers.length >= 3, "总数 131 > 24，应显示分页");
@@ -445,6 +453,7 @@ const DETAIL = {
     (el) => el.type === "img" && el.props && el.props.src === DETAIL.pictureUrl,
   );
   assert.strictEqual(hero.length, 1, "应显示主图（第一候选）");
+  assert.strictEqual(hero[0].props["data-zoomable"], "true", "主图应使用 ZoomableImage");
 
   assert.ok(text.indexOf(MODS[0].name) !== -1, "应显示标题");
   assert.ok(text.indexOf("1.28M 次下载") !== -1, "应显示下载量元信息");
@@ -457,7 +466,10 @@ const DETAIL = {
   assert.ok(body, "简介应渲染在正文容器里");
 
   // 排版补丁：必须是"宿主类作用域"，不能新造类名（tailwind 是按需编译的）
-  const styleNode = findAll(tree, (el) => el.type === "style")[0];
+  const detailStyles = findAll(tree, (el) => el.type === "style");
+  const styleNode = detailStyles.find(
+    (el) => textOf(el).indexOf(".nxm-modal .nxm-modal-panel a") !== -1,
+  );
   assert.ok(styleNode, "应注入 BBCode 排版补丁 <style>");
   const cssText = textOf(styleNode);
   assert.ok(

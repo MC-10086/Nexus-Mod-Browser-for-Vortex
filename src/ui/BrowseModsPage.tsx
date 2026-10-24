@@ -59,6 +59,18 @@ interface IRequirementDetailState {
   error?: string;
 }
 
+/** 卡片封面放大：让 ZoomableImage 内部的 img 填满 nxm-image-mod 的宽高 */
+const CARD_ZOOM_CSS = `
+.mod-cover-zoom .zoomable-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: cover;
+}
+`;
+
 export default function BrowseModsPage(props: IBrowseModsPageProps) {
   const { api } = props;
 
@@ -602,7 +614,6 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
                 void handleDownload(mod);
               }
             }}
-            onOpen={() => openExternal(modPageUrl(domain, mod.modId))}
             onViewPage={() => openExternal(modPageUrl(domain, mod.modId))}
             onDetails={() => openDetail(mod)}
           />
@@ -613,6 +624,7 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
 
   return (
     <MainPage id="nexus-mod-browser-page">
+      <style>{CARD_ZOOM_CSS}</style>
       <MainPage.Body className="h-full overflow-y-auto pt-6" ref={scrollRef}>
         <TabBar className="overflow-clip pl-6">
           <TabButton name={t("page.tab")} count={slice.totalCount} selected />
@@ -663,7 +675,7 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
             </div>
 
             <div className="flex items-center gap-x-2">
-              {/* 复用已有的下拉组件，不再自己写 <select> */}
+              {/* 语言下拉：复用已有的 SortMenu */}
               <SortMenu
                 options={LANGUAGES.map((item) => ({ id: item.id, label: item.label }))}
                 value={language}

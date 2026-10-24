@@ -126,6 +126,8 @@ declare module "@nexusmods/vortex-api" {
   export const TooltipControls: any;
   /** 带多 src 回退的图片控件（props: { srcs: string[], ...img }) */
   export const Image: any;
+  /** 宿主自带的点击放大控件（props: { className, url, container?, overlayClass? }） */
+  export const ZoomableImage: any;
 
   /** 运行时工具（本项目当前未使用，保留声明便于后续接入） */
   export const util: any;
