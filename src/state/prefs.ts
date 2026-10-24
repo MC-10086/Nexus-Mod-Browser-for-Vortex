@@ -1,20 +1,25 @@
 /**
  * 持久化偏好（persistent.nexusBrowserPrefs）
  * ---------------------------------------------------------------------------
- * 只存一类东西：**用户勾了"不再提醒"的前置**。
+ * 这里只存两类需要跨重启保留的小数据：
  *
- * 为什么需要它：有些用户的前置是从网盘/手动装的，Vortex 里没有 attributes.modId，
- * 我们无法识别成"已安装"。弹窗里勾上"不再提醒" = 声明本地已经有了 / 不想再被提醒，
- * 记在这里；以后**任何** MOD 再需要这个前置时都直接跳过。
+ *   1. **用户勾了"不再提醒"的前置**
+ *      有些用户的前置是从网盘/手动装的，Vortex 里没有 attributes.modId，
+ *      我们无法识别成"已安装"。弹窗里勾上"不再提醒" = 声明本地已经有了 / 不想再被提醒，
+ *      记在这里；以后**任何** MOD 再需要这个前置时都直接跳过。
+ *
+ *   2. **插件 UI 语言**（只在用户从页头下拉框选择时写一次）
  *
  * 注意：
  *   - 这是 persistent 分支，Vortex 重启后仍然保留
  *   - 如果用户后来用 Vortex 装了同一个前置，实装判定优先，这份标记不影响
  *   - 标记按"游戏域名 + 前置 modId"存；modId 只在游戏内唯一，所以必须带域名
+ *   - 语言不要跟随宿主语言自动写；默认中文，读取时用 prefsLanguage() 做校验
  */
 
 import { INexusBrowserPrefs } from "../types";
-import { isLanguage, Language } from "../i18n";
+import { isLanguage } from "../i18n";
+import type { Language } from "../i18n";
 
 export const PREFS_ACTIONS = {
   MARK_MANUAL_REQUIREMENT: "NEXUS_BROWSER_MARK_MANUAL_REQUIREMENT",
@@ -86,6 +91,7 @@ export const prefsReducerSpec = {
       payload: { language: Language },
     ) => {
       const language = payload?.language;
+      // 相同语言直接返回原 state，避免无意义的重渲染 / 持久化写入
       if (!isLanguage(language) || state.language === language) {
         return state;
       }
@@ -106,7 +112,7 @@ export function manualRequirementIds(state: any, domain: string): number[] {
   return prefsSlice(state).manualRequirements?.[domain] ?? [];
 }
 
-/** 用户保存的插件语言；只有用户主动选择时才改变 */
+/** 用户保存的插件语言；只由用户在页头下拉框选择时改变，缺省/脏数据回退中文 */
 export function prefsLanguage(state: any): Language {
   const value = prefsSlice(state).language;
   return isLanguage(value) ? value : "zh";

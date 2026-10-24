@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Nexus 业务服务层
  * ---------------------------------------------------------------------------
  * 职责：
@@ -36,7 +36,7 @@ import {
 } from "./queries";
 
 /** 解析出来的游戏信息 */
-export interface INexusGame {
+interface INexusGame {
   id: string;
   name: string;
   domainName: string;
@@ -227,3 +227,4 @@ export class NexusService {
     );
   }
 }
+

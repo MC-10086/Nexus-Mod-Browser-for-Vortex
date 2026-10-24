@@ -23,9 +23,9 @@ export interface IModSummary {
   createdAt?: string;
   updatedAt?: string;
   pictureUrl?: string;
-  /** 大缩略图，主图失效时兜底（详情查询里有，列表查询没查） */
+  /** 大缩略图；主图缺失时作为第一候选（详情查询有，列表查询没查） */
   thumbnailLargeUrl?: string;
-  /** 小缩略图，最后兜底（详情查询里有，列表查询没查） */
+  /** 小缩略图；主图和大缩略图都缺失时作为候选（详情查询有，列表查询没查） */
   thumbnailUrl?: string;
   game?: { domainName?: string; id?: string };
   uploader?: { name?: string };
@@ -62,7 +62,7 @@ export interface IModFile {
 }
 
 /** 一条 Nexus 前置（对应 GraphQL `ModRequirement`） */
-export interface IModRequirement {
+interface IModRequirement {
   /** 前置所属游戏的**数字** id（如 "1704"），用来判断是不是同一个游戏 */
   gameId?: string;
   /** 前置的 Nexus mod id（字符串；站外组件是 "0"） */
@@ -75,7 +75,7 @@ export interface IModRequirement {
 }
 
 /** 一条 DLC 前置（无法检测，只提示） */
-export interface IModDlcRequirement {
+interface IModDlcRequirement {
   notes?: string;
   gameExpansion?: { id?: string; name?: string };
 }
@@ -111,7 +111,8 @@ export interface ISearchResult {
   nodes: IModSummary[];
 }
 
-/** 插件自己的 state 切片（session.nexusBrowser） */export interface INexusBrowserState {
+/** 插件自己的 state 切片（session.nexusBrowser） */
+export interface INexusBrowserState {
   /** 当前结果对应的游戏域名；切换游戏时用于判断是否需要重查 */
   domain?: string;
   query: string;
@@ -125,11 +126,8 @@ export interface ISearchResult {
   detail?: IModDetail;
   /** 详情加载失败的文案（成功或关闭时清空） */
   detailError?: string;
-  files: IModFile[];
-  /** 详情/文件是否在加载 */
+  /** 详情是否在加载 */
   detailLoading: boolean;
-  /** 下载并安装（false = 只下载） */
-  autoInstall: boolean;
 }
 
 /** 规范化后的错误 */
@@ -141,11 +139,14 @@ export interface INexusError extends Error {
 
 /**
  * 持久化偏好（persistent.nexusBrowserPrefs）
- * 目前只有"手动安装的前置"：用户在弹窗里取消勾选 = 本地已经有了（网盘/手动装）。
+ * 只放"需要跨重启保留"的小数据：
+ *   - 用户手动标记过的前置（按游戏域名分组）
+ *   - 插件 UI 语言（只由用户在页头下拉框修改）
  */
 export interface INexusBrowserPrefs {
   /** 游戏域名 → 已手动安装的前置 Nexus mod id 列表 */
   manualRequirements: { [domain: string]: number[] };
-  /** 插件 UI 语言（只由用户在页头选择框里修改） */
+  /** 插件 UI 语言（只由用户在页头下拉框里修改，不跟随宿主） */
   language: Language;
 }
+

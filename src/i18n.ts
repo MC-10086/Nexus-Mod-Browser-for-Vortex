@@ -1,14 +1,23 @@
 /**
  * 插件自带的多语言（只翻译插件 UI，不翻译任何 N 网内容）
  * ---------------------------------------------------------------------------
- * 设计约束（产品要求）：
+ * 设计约束（产品要求，改动前先读）：
  *   - N 网返回的内容（MOD 名、简介、作者、文件名、分类名、DLC、前置备注）原样显示；
- *   - 语言只在用户通过页头选择框选择时改变一次，不跟随 Vortex 语言、不自动探测；
+ *   - 语言只在用户通过页头下拉框选择时改变一次，不跟随 Vortex 语言、不自动探测；
  *   - 不引入 i18next 等运行时库；字典直接编译进 JS，查表是 O(1)。
+ *
+ * 如何新增一条文案：
+ *   1. 在 EN 里加 key（只写英文）；
+ *   2. TS 会要求 ZH / JA 同步补全（Record<MessageKey, string>）；
+ *   3. 用 `t("key")` 取文案；带变量写成 `t("key", { count })`，字典里写 `{count}`。
+ *
+ * 注意：`t()` 依赖模块级 `current`，不要在模块顶层把 `t()` 的结果存成常量
+ * （否则切换语言后不会更新）；在 render / 事件回调里调用。
  */
 
 export type Language = "zh" | "en" | "ja";
 
+/** 页头下拉框的选项顺序就是这里的顺序（标签不翻译，始终显示各语言自己的名字） */
 export const LANGUAGES: Array<{ id: Language; label: string }> = [
   { id: "zh", label: "中文" },
   { id: "en", label: "English" },
@@ -385,22 +394,32 @@ const JA: Record<MessageKey, string> = {
 
 const MESSAGES: Record<Language, Record<MessageKey, string>> = { en: EN, zh: ZH, ja: JA };
 
+/** 当前语言。默认中文；只在用户选择时由 setLanguage 改写。 */
 let current: Language = "zh";
 
-/** 只在用户选择语言时调用；不要跟随宿主语言自动更新 */
+/**
+ * 切换模块语言。调用方（BrowseModsPage）同时负责更新 React state 和持久化偏好；
+ * 这里只改查表用的 current，不做任何副作用。
+ */
 export function setLanguage(language: Language): void {
   current = language;
 }
 
+/** 当前语言（主要给测试 / 调试用；UI 请直接用 t()） */
 export function getLanguage(): Language {
   return current;
 }
 
+/** 校验持久化里读出来的值，避免旧版本 / 手改 JSON 的脏数据让 t() 查错表 */
 export function isLanguage(value: unknown): value is Language {
   return value === "zh" || value === "en" || value === "ja";
 }
 
-/** O(1) 查表 + `{name}` 占位符替换；不解析 JSON、不做正则大循环 */
+/**
+ * O(1) 查表 + `{name}` 占位符替换。
+ * 未知 key 回退到英文，再回退到 key 本身（方便发现漏翻，而不是显示空白）。
+ * 不做正则大循环；参数只做字符串 split/join，适合在 render 里高频调用。
+ */
 export function t(key: MessageKey, params?: Record<string, string | number>): string {
   let text = MESSAGES[current][key] ?? MESSAGES.en[key] ?? key;
   if (params !== undefined) {

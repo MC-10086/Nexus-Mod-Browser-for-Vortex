@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Nexus GraphQL v2 传输层（最底层）
  * ---------------------------------------------------------------------------
  * 为什么用 Node 的 `https` 而不是 `fetch`：
@@ -152,3 +152,4 @@ export async function graphql<T>(
 }
 
 export { GRAPHQL_ENDPOINT };
+

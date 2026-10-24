@@ -127,11 +127,6 @@ test("formatUnixDate", () => {
   assert.match(format.formatUnixDate(1714521600), /^2024-0[45]-\d\d$/);
 });
 
-test("bbcodeToPlainText 去掉标记与图片", () => {
-  const input = "[b]Hello[/b] [img]http://x/y.png[/img] [url=https://a.b]link[/url]\n\n\n\ntail";
-  assert.strictEqual(format.bbcodeToPlainText(input), "Hello  link\n\ntail");
-});
-
 // ---------------------------------------------------------------------------
 // 3) reducer 状态迁移
 // ---------------------------------------------------------------------------
@@ -165,15 +160,14 @@ test("LOAD_SUCCESS 落结果并停止 loading", () => {
   assert.strictEqual(next.domain, "skyrimspecialedition");
 });
 
-test("SET_GAME 重置结果但保留排序与自动安装偏好", () => {
+test("SET_GAME 重置结果但保留排序", () => {
   const next = reduce(
-    { ...DEFAULTS, sort: "downloads", autoInstall: false, results: [{ modId: 1 }] },
+    { ...DEFAULTS, sort: "downloads", results: [{ modId: 1 }] },
     { type: "NEXUS_BROWSER_SET_GAME", payload: { domain: "fallout4" } },
   );
   assert.strictEqual(next.domain, "fallout4");
   assert.strictEqual(next.results.length, 0);
   assert.strictEqual(next.sort, "downloads");
-  assert.strictEqual(next.autoInstall, false);
   assert.strictEqual(next.loading, true);
 });
 
@@ -185,7 +179,6 @@ test("CLOSE_DETAIL 清空详情但不影响结果", () => {
       selectedModId: 1,
       detail: { modId: 1 },
       detailError: "boom",
-      files: [{ fileId: 2 }],
       detailLoading: true,
     },
     { type: "NEXUS_BROWSER_CLOSE_DETAIL", payload: {} },
@@ -193,7 +186,6 @@ test("CLOSE_DETAIL 清空详情但不影响结果", () => {
   assert.strictEqual(next.selectedModId, undefined);
   assert.strictEqual(next.detail, undefined);
   assert.strictEqual(next.detailError, undefined);
-  assert.strictEqual(next.files.length, 0);
   assert.strictEqual(next.detailLoading, false);
   assert.strictEqual(next.results.length, 1);
 });
@@ -207,14 +199,12 @@ test("SELECT_MOD 只重置详情相关字段，不动列表", () => {
       selectedModId: 1,
       detail: { modId: 1 },
       detailError: "old",
-      files: [{ fileId: 2 }],
     },
     { type: "NEXUS_BROWSER_SELECT_MOD", payload: { modId: 42 } },
   );
   assert.strictEqual(next.selectedModId, 42);
   assert.strictEqual(next.detail, undefined);
   assert.strictEqual(next.detailError, undefined);
-  assert.strictEqual(next.files.length, 0);
   assert.strictEqual(next.detailLoading, true);
   assert.strictEqual(next.results.length, 1);
   assert.strictEqual(next.totalCount, 9);
@@ -1159,10 +1149,10 @@ async function main() {
       "[b]full[/b]",
     );
     assert.strictEqual(detailUtil.detailBody({ description: "   ", summary: "short" }), "short");
-    assert.strictEqual(detailUtil.detailBody({ description: "", summary: "" }), detailUtil.EMPTY_DESCRIPTION);
-    assert.strictEqual(detailUtil.detailBody(undefined), detailUtil.EMPTY_DESCRIPTION);
+    assert.strictEqual(detailUtil.detailBody({ description: "", summary: "" }), "该 MOD 未提供简介。");
+    assert.strictEqual(detailUtil.detailBody(undefined), "该 MOD 未提供简介。");
     // 只有 <br /> 的描述渲染出来是空白 → 也算"没提供简介"
-    assert.strictEqual(detailUtil.detailBody({ description: "<br />", summary: "" }), detailUtil.EMPTY_DESCRIPTION);
+    assert.strictEqual(detailUtil.detailBody({ description: "<br />", summary: "" }), "该 MOD 未提供简介。");
   });
 
   test("换行归一化成成对的 [br][/br]（裸 \\n 不丢、不双倍）", () => {
@@ -1285,10 +1275,6 @@ async function main() {
   test("默认勾选只包含未安装项", () => {
     const rows = buildRows(REQ_INFO);
     assert.deepStrictEqual(reqUtil.defaultSelectedModIds(rows), [30379, 266]);
-    assert.deepStrictEqual(
-      reqUtil.downloadableRows(rows).map((row) => row.modId),
-      [30379, 266],
-    );
   });
 
   test("不再提醒：勾上=mark，取消=unmark", () => {

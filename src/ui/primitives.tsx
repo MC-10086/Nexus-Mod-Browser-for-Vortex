@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 基础控件
  * ---------------------------------------------------------------------------
  * 这些不是"重新实现一套 UI"，而是**对宿主现有 CSS 类的最小封装**：
@@ -19,10 +19,10 @@ import { ButtonIcon, Icon, IconName } from "./icons";
 // Button
 // ---------------------------------------------------------------------------
 
-export type ButtonBrand = "primary" | "info" | "neutral" | "success" | "danger" | "premium";
-export type ButtonAppearance = "weak" | "subdued" | "moderate" | "strong";
+type ButtonBrand = "primary" | "info" | "neutral" | "success" | "danger" | "premium";
+type ButtonAppearance = "weak" | "subdued" | "moderate" | "strong";
 
-export interface IButtonProps {
+interface IButtonProps {
   brand?: ButtonBrand;
   appearance?: ButtonAppearance;
   size?: "md" | "sm";
@@ -98,7 +98,7 @@ export function Button(props: IButtonProps) {
 // 标签页
 // ---------------------------------------------------------------------------
 
-export interface ITabButtonProps {
+interface ITabButtonProps {
   name: string;
   count?: number;
   selected?: boolean;
@@ -146,7 +146,7 @@ export function TabButton(props: ITabButtonProps) {
 // 分页
 // ---------------------------------------------------------------------------
 
-export interface IPaginationProps {
+interface IPaginationProps {
   currentPage: number; // 1-based
   totalPages: number;
   onChange: (page: number) => void;
@@ -225,12 +225,12 @@ export function Pagination(props: IPaginationProps) {
 // 排序下拉
 // ---------------------------------------------------------------------------
 
-export interface ISortOption {
+interface ISortOption {
   id: string;
   label: string;
 }
 
-export interface ISortMenuProps {
+interface ISortMenuProps {
   options: ISortOption[];
   value: string;
   onChange: (id: string) => void;
@@ -301,3 +301,4 @@ export function SortMenu(props: ISortMenuProps) {
     </div>
   );
 }
+

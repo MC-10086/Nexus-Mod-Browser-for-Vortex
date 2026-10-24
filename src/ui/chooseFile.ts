@@ -36,9 +36,9 @@ export const CHOOSE_FILE_ACTION = {
 };
 
 /**
- * 首选文件：优先 N 网标记的 primary=1，否则取上传时间最新的那个。
+ * 首选文件（内部 helper）：优先 N 网标记的 primary=1，否则取上传时间最新的那个。
  */
-export function defaultFileOf(files: IModFile[]): IModFile | undefined {
+function defaultFileOf(files: IModFile[]): IModFile | undefined {
   if (files.length === 0) {
     return undefined;
   }

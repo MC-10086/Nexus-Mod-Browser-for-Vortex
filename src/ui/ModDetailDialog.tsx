@@ -4,12 +4,13 @@
  * 定位：**纯展示组件**。数据、加载态、错误全部由页面传入，这里不碰 store、不发请求。
  * 因此"怎么打开它"是可以随时换的：
  *   - 现在：卡片底部的 Details 按钮 → dispatch(selectMod(id))
- *   - 以后想改成点封面 / 双击 / 右键菜单：只要在页面里换个地方调 openDetail()，
+ *   - 以后想改成双击 / 右键菜单：只要在页面里换个地方调 openDetail()，
  *     本组件与状态层完全不用动（详见 BrowseModsPage.tsx 的 openDetail）。
+ *   - 卡片封面现在用于"点击放大"，不承担打开详情 / 打开网页的职责。
  *
  * 复用的宿主素材（全部是运行时调用，不复制源码）：
  *   - util.bbcodeToReact   渲染 N 网 BBCode 简介（含粗体/链接/列表/图片/折叠块）
- *   - Image                三级图片兜底（srcs 数组按顺序回退）
+ *   - ZoomableImage        主图点击全屏放大（单 URL；没有多 src 回退）
  *   - nxm-modal-*          弹窗外壳（fixed 全屏遮罩 + 面板 + 关闭按钮）
  *   - nxm-image            图片容器（背景、居中、圆角裁切）
  *
@@ -29,7 +30,7 @@ import { detailBody, detailImageSources, detailMeta } from "../util/detail";
 import { Button } from "./primitives";
 import { Icon } from "./icons";
 
-export interface IModDetailDialogProps {
+interface IModDetailDialogProps {
   /** 列表里的卡片数据：弹窗一打开就能显示标题/主图，不必等详情回来 */
   summary?: IModSummary;
   /** 没有 summary 时的兜底标题（例如从「前置」行打开详情） */

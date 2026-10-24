@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 前置（Requirements）流程编排
  * ---------------------------------------------------------------------------
  * 拆成三块，页面只负责"什么时候调用"：
@@ -28,14 +28,14 @@ import { IInstalledNexusMod } from "../util/mods";
 import { notify } from "./notify";
 import { IRequirementsDialogData } from "./RequirementsDialog";
 
-export interface IRequirementsContext {
+interface IRequirementsContext {
   /** Nexus 游戏域名（如 skyrimspecialedition） */
   domain: string;
   /** Vortex 内部游戏 id（如 skyrimse） */
   internalGameId: string;
 }
 
-export interface IBuildPromptOptions extends IRequirementsContext {
+interface IBuildPromptOptions extends IRequirementsContext {
   modId: number;
   modName: string;
   installed: Map<number, IInstalledNexusMod>;
@@ -151,7 +151,7 @@ export async function startRequirementDownload(
   }
 }
 
-export interface IRequirementDownloadResult {
+interface IRequirementDownloadResult {
   started: number;
   failed: number;
 }
@@ -270,3 +270,4 @@ export function notifyRequirementSummary(
 
   notify(api, "info", parts.join(t("common.listSeparator")) + suffix, 7000);
 }
+

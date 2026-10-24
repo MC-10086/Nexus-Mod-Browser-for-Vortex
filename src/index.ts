@@ -19,7 +19,7 @@ import BrowseModsPage from "./ui/BrowseModsPage";
  * Vortex 的 IExtensionContext 子集。
  * 只声明本项目用到的成员，避免依赖 `@nexusmods/vortex-api`（它只有类型，运行时不可 require）。
  */
-export interface IExtensionContextLite {
+interface IExtensionContextLite {
   /** 注册 redux reducer：path 决定 state 位置与是否持久化 */
   registerReducer: (path: string[], spec: any) => void;
 

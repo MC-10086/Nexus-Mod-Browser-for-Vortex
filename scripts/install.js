@@ -86,4 +86,4 @@ if (fs.existsSync(target)) {
 fs.copyFileSync(path.join(projectRoot, "info.json"), path.join(target, "info.json"));
 copyRecursive(path.join(projectRoot, "dist"), target);
 
-console.log("[install] 完成。请重启 Vortex，左侧导航会出现「Browse Nexus Mods」。");
+console.log("[install] 完成。请重启 Vortex，左侧导航会出现「Nexus Mod Browser」。");

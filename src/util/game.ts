@@ -17,8 +17,8 @@
  *   apiKey/isPremium → src/extensions/nexus_integration/selectors.ts:11/25
  */
 
-/** Vortex 内部游戏记录（只声明我们要用的字段） */
-export interface IGameStoredLite {
+/** Vortex 内部游戏记录（只声明我们要用的字段；不导出，外部只通过函数访问） */
+interface IGameStoredLite {
   id: string;
   name?: string;
   details?: {
@@ -39,19 +39,13 @@ export function activeGameId(state: any): string | undefined {
   return profile?.gameId;
 }
 
-/** 当前激活的 profile（插件里基本用不到，但排查问题时很有用） */
-export function activeProfile(state: any): any {
-  const profileId = state?.settings?.profiles?.activeProfileId;
-  return profileId === undefined ? undefined : state?.persistent?.profiles?.[profileId];
-}
-
-/** 已注册的全部游戏（数组） */
-export function knownGames(state: any): IGameStoredLite[] {
+/** 已注册的全部游戏（数组；内部 helper） */
+function knownGames(state: any): IGameStoredLite[] {
   return state?.session?.gameMode?.known ?? [];
 }
 
-/** 按内部 id 查找游戏记录 */
-export function gameById(state: any, gameId: string): IGameStoredLite | undefined {
+/** 按内部 id 查找游戏记录（内部 helper） */
+function gameById(state: any, gameId: string): IGameStoredLite | undefined {
   if (!gameId) {
     return undefined;
   }
@@ -94,12 +88,6 @@ export function gameName(state: any, gameId: string): string {
 /** 用户的 Nexus API Key（未登录时为 undefined） */
 export function nexusApiKey(state: any): string | undefined {
   return state?.confidential?.account?.nexus?.APIKey;
-}
-
-/** 是否已登录 Nexus（API Key 或 OAuth 任一存在） */
-export function isNexusLoggedIn(state: any): boolean {
-  const nexus = state?.confidential?.account?.nexus;
-  return Boolean(nexus?.APIKey) || Boolean(nexus?.OAuthCredentials);
 }
 
 /** 是否 Premium（未加载完成时按 false 处理，仅用于 UI 提示，不用于功能门禁） */

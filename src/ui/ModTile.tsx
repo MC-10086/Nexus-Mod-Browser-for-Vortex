@@ -8,6 +8,11 @@
  *   统计行 border-t border-stroke-weak pt-1.5
  *   底部条 rounded-b bg-surface-translucent-low px-3 py-2
  * 因此外观与官方合集卡片一致，但我们只写 JSX，不复制任何源码。
+ *
+ * 交互契约：
+ *   - 封面点击 = 用宿主 ZoomableImage 全屏放大（再点关闭），**不打开 N 网**；
+ *   - N 网页面只走底部 View page 按钮；完整简介只走 Details 按钮；
+ *   - 卡片本身不绑定点击 / 不绑定 hover 预热，避免误触和多余请求。
  */
 
 import * as React from "react";
@@ -20,7 +25,7 @@ import { formatCount } from "../util/format";
 import { Icon, IconName } from "./icons";
 import { Button } from "./primitives";
 
-export interface IModTileProps {
+interface IModTileProps {
   mod: IModSummary;
   /** 分类名（GraphQL 的 category 是字符串；没有时传 undefined） */
   category?: string;

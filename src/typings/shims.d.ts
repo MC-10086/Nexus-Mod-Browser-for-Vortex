@@ -49,13 +49,6 @@ declare module "https" {
 }
 
 declare module "react" {
-  export type ReactNode = any;
-  export type ReactElement = any;
-  export type FC<P = any> = (props: P) => any;
-  export type ComponentType<P = any> = (props: P) => any;
-  export type PropsWithChildren<P = any> = P & { children?: any };
-  export type CSSProperties = { [key: string]: string | number };
-
   export function createElement(
     type: any,
     props?: any,
@@ -73,22 +66,13 @@ declare module "react" {
 
   export function useMemo<T>(factory: () => T, deps: any[]): T;
 
-  export function useCallback<T extends (...args: any[]) => any>(
-    callback: T,
-    deps: any[],
-  ): T;
-
   export function useRef<T>(initial: T): { current: T };
-
-  export const Fragment: any;
 
   const React: {
     createElement: typeof createElement;
-    Fragment: any;
     useState: typeof useState;
     useEffect: typeof useEffect;
     useMemo: typeof useMemo;
-    useCallback: typeof useCallback;
     useRef: typeof useRef;
   };
   export default React;
@@ -116,24 +100,10 @@ declare namespace JSX {
 declare module "@nexusmods/vortex-api" {
   /** 页面外壳：<MainPage><MainPage.Body>…</MainPage.Body></MainPage> */
   export const MainPage: any;
-  export const MainContext: any;
-  export const DNDContainer: any;
 
-  /** 旧控件库（vortex-api 的 controls/api） */
-  export const FlexLayout: any;
-  export const Table: any;
-  export const Icon: any;
-  export const TooltipControls: any;
-  /** 带多 src 回退的图片控件（props: { srcs: string[], ...img }) */
-  export const Image: any;
+  /** 宿主的 BBCode / 纯文本工具 */
+  export const util: any;
+
   /** 宿主自带的点击放大控件（props: { className, url, container?, overlayClass? }） */
   export const ZoomableImage: any;
-
-  /** 运行时工具（本项目当前未使用，保留声明便于后续接入） */
-  export const util: any;
-  export const selectors: any;
-  export const actions: any;
-  export const fs: any;
-  export const log: any;
-  export const types: any;
 }

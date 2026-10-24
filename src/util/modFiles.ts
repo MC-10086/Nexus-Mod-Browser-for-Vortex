@@ -11,9 +11,10 @@
  */
 
 import { IModFile } from "../types";
-import { MessageKey, t } from "../i18n";
+import { t } from "../i18n";
+import type { MessageKey } from "../i18n";
 
-export interface IFileCategoryInfo {
+interface IFileCategoryInfo {
   /** 规范化的枚举名 */
   name: string;
   /** 给用户看的当前语言标签 */
@@ -41,8 +42,8 @@ const LABEL_KEYS: { [name: string]: MessageKey } = {
   ARCHIVED: "category.archived",
 };
 
-/** 把数字或字符串统一成枚举名；无法识别时返回 undefined */
-export function categoryNameOf(category: number | string | undefined | null): string | undefined {
+/** 把数字或字符串统一成枚举名；无法识别时返回 undefined（内部 helper） */
+function categoryNameOf(category: number | string | undefined | null): string | undefined {
   if (category === undefined || category === null) {
     return undefined;
   }

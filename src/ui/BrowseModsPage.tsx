@@ -9,8 +9,14 @@
  *   - 页面外壳 import { MainPage } from "@nexusmods/vortex-api"
  *   - 控件全部使用宿主 nxm-* 语义类（见 primitives.tsx）
  *
- * 约定：`slice.loading` 同时是"需要查询"的信号（任何改参数的动作都会置位），
- * 查询完成由 loadSuccess/loadError 清零，天然避免重复请求与 effect 死循环。
+ * 几条接手时必须守住的不变量：
+ *   1. `slice.loading` 同时是"需要查询"的信号（改参数的动作会置位），
+ *      查询完成由 loadSuccess/loadError 清零，避免重复请求与 effect 死循环。
+ *   2. 语言只在 handleLanguageChange 里更新一次（模块 t + React state + 持久化）；
+ *      不要加"跟随宿主语言"的 effect，也不要让语言进入查询 key。
+ *   3. MOD 名称 / 简介 / 作者 / 文件名 / N 网分类 / DLC / 前置备注一律原样显示，
+ *      不要把这些数据传进 t()。
+ *   4. 卡片封面和详情主图用宿主 ZoomableImage（点击放大）；卡片封面不再打开 N 网。
  */
 
 import * as React from "react";
@@ -49,7 +55,7 @@ import {
 } from "./requirementsPrompt";
 import { Button, Pagination, SortMenu, TabBar, TabButton } from "./primitives";
 
-export interface IBrowseModsPageProps {
+interface IBrowseModsPageProps {
   api: any;
 }
 
@@ -80,7 +86,7 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
   /**
    * 插件语言：
    *   - 只在初始化时从持久化偏好读一次（没有则中文）；
-   *   - 之后只由页头选择框的用户操作改变，不跟随 Vortex 语言、不做自动探测。
+   *   - 之后只由页头下拉框的用户操作改变，不跟随 Vortex 语言、不做自动探测。
    */
   const [language, setLanguageState] = React.useState<Language>(() => {
     const initial = prefsLanguage(api.getState());
@@ -466,7 +472,7 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
           modId: mod.modId,
           fileId: file.fileId,
           fileName: file.name,
-          autoInstall: slice.autoInstall,
+          autoInstall: true,
         },
         {
           // 只有这里被调用，才说明下载真的开始了 → 按钮切成 Downloading…

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 前置（Requirements）弹窗
  * ---------------------------------------------------------------------------
  * 纯展示组件：数据、判定、下载动作全部由页面传入。
@@ -31,7 +31,7 @@ export interface IRequirementsDialogData {
   defaultSelected: number[];
 }
 
-export type RequirementsDecisionKind = "cancel" | "skip" | "download";
+type RequirementsDecisionKind = "cancel" | "skip" | "download";
 
 export interface IRequirementsDecision {
   kind: RequirementsDecisionKind;
@@ -420,3 +420,4 @@ export default function RequirementsDialog(props: IRequirementsDialogProps) {
     </div>
   );
 }
+

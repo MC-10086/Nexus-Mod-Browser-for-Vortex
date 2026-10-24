@@ -2,7 +2,7 @@
  * 详情弹窗的数据整形（纯函数，可在 Node 里单测）
  * ---------------------------------------------------------------------------
  * 弹窗本身只负责"怎么显示"，这里负责"显示什么"：
- *   1. 主图三级兜底（pictureUrl → thumbnailLargeUrl → thumbnailUrl）
+ *   1. 主图候选（pictureUrl → thumbnailLargeUrl → thumbnailUrl；详情只取第一张）
  *   2. 简介回退链（description → summary → 兜底文案）
  *   3. 把 N 网描述里的换行统一成宿主 BBCode 渲染器认识的 [br]
  *
@@ -16,17 +16,14 @@ import { t } from "../i18n";
 import { IModDetail, IModSummary } from "../types";
 import { formatCount } from "./format";
 
-/** 详情/列表都能喂进来（详情字段更全） */
-export type IDetailSource = Partial<IModDetail & IModSummary> | undefined | null;
-
-/** 简介为空时的兜底文案 */
-export const EMPTY_DESCRIPTION = "该 MOD 未提供简介。";
+/** 详情/列表都能喂进来（详情字段更全；内部类型，外部不需要） */
+type IDetailSource = Partial<IModDetail & IModSummary> | undefined | null;
 
 /**
- * 主图候选列表（按兜底顺序）。
+ * 主图候选列表（按优先级）。
  * - 去掉空串 / 纯空白
  * - 去重（有些 MOD 的 pictureUrl 和 thumbnailLargeUrl 完全一样）
- * - 保持顺序（Image 控件就是按数组顺序回退的）
+ * - 保持顺序；当前详情弹窗只取第一张（ZoomableImage 是单 URL 控件）
  */
 export function detailImageSources(mod: IDetailSource): string[] {
   if (mod === undefined || mod === null) {
@@ -49,8 +46,8 @@ export function detailImageSources(mod: IDetailSource): string[] {
   return out;
 }
 
-/** 简介的回退链：description → summary → 兜底文案（返回**未归一化**的原文） */
-export function detailBodySource(mod: IDetailSource): string {
+/** 简介的回退链：description → summary → 空串（内部 helper，外部用 detailBody） */
+function detailBodySource(mod: IDetailSource): string {
   if (mod === undefined || mod === null) {
     return "";
   }

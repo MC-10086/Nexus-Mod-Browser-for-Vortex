@@ -20,7 +20,7 @@ import { t } from "../i18n";
 import { IModRequirementsInfo } from "../types";
 import { IInstalledNexusMod } from "./mods";
 
-export type RequirementKind = "missing" | "manual" | "installed" | "external" | "otherGame";
+type RequirementKind = "missing" | "manual" | "installed" | "external" | "otherGame";
 
 export interface IRequirementRow {
   kind: RequirementKind;
@@ -41,7 +41,7 @@ export interface IDlcRow {
   notes?: string;
 }
 
-export interface IBuildRowsInput {
+interface IBuildRowsInput {
   info: IModRequirementsInfo;
   /** modId → 本地版本（来自 util/mods.installedNexusMods） */
   installed: Map<number, IInstalledNexusMod>;
@@ -54,7 +54,7 @@ export interface IBuildRowsInput {
 }
 
 /** 常见 HTML 实体解码（Nexus 的 DLC 名/备注里会有 &amp;） */
-export function decodeText(input: string | undefined | null): string {
+function decodeText(input: string | undefined | null): string {
   if (input === undefined || input === null) {
     return "";
   }
@@ -70,7 +70,7 @@ export function decodeText(input: string | undefined | null): string {
 }
 
 /** 前置的 Nexus 页面地址（站外前置应该用作者给的 url） */
-export function nexusModUrl(domain: string, modId: number): string {
+function nexusModUrl(domain: string, modId: number): string {
   return `${NEXUS_BASE_URL}/${domain}/mods/${modId}`;
 }
 
@@ -216,11 +216,6 @@ export function hasRequirementsPrompt(rows: IRequirementRow[], dlc: IDlcRow[]): 
   // dlc 不参与触发；保留参数是为了让调用方/测试的语义完整
   void dlc;
   return rows.some((row) => row.kind === "missing");
-}
-
-/** 可勾选下载的行（只含未安装；"不再提醒"的行要先取消忽略） */
-export function downloadableRows(rows: IRequirementRow[]): IRequirementRow[] {
-  return rows.filter((row) => row.downloadable);
 }
 
 /** 默认勾选：所有"未安装"的行（"不再提醒"的默认不勾） */

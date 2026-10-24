@@ -45,8 +45,8 @@ export function formatBytes(input: number | string | undefined | null): string {
   return `${value >= 100 ? value.toFixed(0) : value.toFixed(1)} ${units[index]}`;
 }
 
-/** ISO 时间 → "2024-05-01" */
-export function formatDate(iso: string | undefined): string {
+/** ISO 时间 → "2024-05-01"（内部 helper，formatUnixDate 使用） */
+function formatDate(iso: string | undefined): string {
   if (!iso) {
     return "-";
   }
@@ -64,38 +64,4 @@ export function formatUnixDate(seconds: number | undefined): string {
     return "-";
   }
   return formatDate(new Date(seconds * 1000).toISOString());
-}
-
-/**
- * 极简 BBCode → 纯文本。
- * Nexus 的 mod 描述是 BBCode（[b] [url=] [img] 等），MVP 阶段不做富文本渲染，
- * 只去掉标记保留文字，避免把 `[b]` 直接显示给用户。
- */
-export function bbcodeToPlainText(input: string | undefined): string {
-  if (!input) {
-    return "";
-  }
-  return input
-    // [img]...[/img] 整体丢弃
-    .replace(/\[img\][\s\S]*?\[\/img\]/gi, "")
-    // [url=xxx]text[/url] → text；[url]xxx[/url] → xxx
-    .replace(/\[url=[^\]]*\]([\s\S]*?)\[\/url\]/gi, "$1")
-    .replace(/\[url\]([\s\S]*?)\[\/url\]/gi, "$1")
-    // 其余 [xxx] / [/xxx] 标记直接去掉
-    .replace(/\[\/?[a-z*][^\]]*\]/gi, "")
-    // HTML 标签也顺手清掉
-    .replace(/<[^>]+>/g, "")
-    .replace(/\r\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-/** 截断长文本，保留完整单词边界 */
-export function truncate(text: string, maxLength: number): string {
-  if (!text || text.length <= maxLength) {
-    return text ?? "";
-  }
-  const slice = text.slice(0, maxLength);
-  const lastSpace = slice.lastIndexOf(" ");
-  return (lastSpace > maxLength * 0.6 ? slice.slice(0, lastSpace) : slice) + "…";
 }

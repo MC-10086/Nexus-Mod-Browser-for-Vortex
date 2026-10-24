@@ -31,9 +31,6 @@ export const MIRRORED_SEARCH_ICON =
 /** 每页条数。GraphQL 的 count 建议 <= 50 */
 export const DEFAULT_PAGE_SIZE = 24;
 
-/** 搜索输入防抖（毫秒） */
-export const SEARCH_DEBOUNCE_MS = 350;
-
 /** 搜索结果 / 详情缓存时间 */
 export const CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -55,9 +52,6 @@ export const GAME_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 /** 单次 HTTP 请求超时 */
 export const REQUEST_TIMEOUT_MS = 20000;
 
-/** 插件自己的 state 分支：session.nexusBrowser（session = 不持久化） */
-export const SLICE_KEY = "nexusBrowser";
-
 /** Redux action 名称（纯字符串，不依赖 redux-act） */
 export const ACTIONS = {
   SET_QUERY: "NEXUS_BROWSER_SET_QUERY",
@@ -71,14 +65,11 @@ export const ACTIONS = {
   CLOSE_DETAIL: "NEXUS_BROWSER_CLOSE_DETAIL",
   SET_DETAIL: "NEXUS_BROWSER_SET_DETAIL",
   SET_DETAIL_ERROR: "NEXUS_BROWSER_SET_DETAIL_ERROR",
-  SET_FILES: "NEXUS_BROWSER_SET_FILES",
-  SET_AUTO_INSTALL: "NEXUS_BROWSER_SET_AUTO_INSTALL",
-  RESET: "NEXUS_BROWSER_RESET",
 };
 
 /**
  * 排序选项：field 直接对应 GraphQL 的 ModsSort 字段。
- * labelKey 指向 i18n 字典；中文/英文不再拼在一起，由当前语言决定显示哪一个。
+ * labelKey 指向 i18n 字典；中文 / 英文 / 日文不再拼在一起，由当前语言决定显示哪一个。
  */
 export const SORT_OPTIONS: Array<{ id: string; labelKey: MessageKey; field: string }> = [
   { id: "relevance", labelKey: "sort.relevance", field: "relevance" },

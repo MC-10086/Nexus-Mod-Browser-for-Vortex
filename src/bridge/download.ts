@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 下载桥接层
  * ---------------------------------------------------------------------------
  * 两条路，按账号自动选择（入口：`downloadForUser`）：
@@ -25,12 +25,11 @@
  */
 
 import { t } from "../i18n";
-import { isPremium } from "../util/game";
 import { isNexusModInstalled } from "../util/mods";
 import { modFilePageUrl, openExternal } from "../util/openExternal";
 
 /** 一次下载请求所需的全部信息 */
-export interface IDownloadRequest {
+interface IDownloadRequest {
   /** Nexus 游戏域名，如 skyrimspecialedition */
   domain: string;
   /** Vortex 内部游戏 id，如 skyrimse（注意：不是域名） */
@@ -43,7 +42,7 @@ export interface IDownloadRequest {
   autoInstall: boolean;
 }
 
-export interface IDownloadOutcome {
+interface IDownloadOutcome {
   /** Vortex 的下载 id（失败/取消时为 undefined） */
   downloadId?: string;
   /** 安装后的 mod id（未安装时为 undefined） */
@@ -58,7 +57,7 @@ export interface IDownloadOutcome {
   timedOut?: boolean;
 }
 
-export interface IDownloadOptions {
+interface IDownloadOptions {
   /** 下载**真正开始**时回调一次（UI 用它把按钮切成 Downloading…） */
   onStarted?: (downloadId?: string) => void;
   /**
@@ -82,8 +81,8 @@ export interface IDownloadOptions {
 export const DEFAULT_START_TIMEOUT_MS = 2 * 60_000;
 const DEFAULT_POLL_INTERVAL_MS = 500;
 
-/** 构造 nxm 链接 */
-export function buildNxmUrl(domain: string, modId: number, fileId: number): string {
+/** 构造 nxm 链接（内部 helper；Premium 路径的 emit 参数） */
+function buildNxmUrl(domain: string, modId: number, fileId: number): string {
   return `nxm://${domain}/mods/${modId}/files/${fileId}`;
 }
 
@@ -450,3 +449,4 @@ export function downloadForUser(
   }
   return downloadModFile(api, request, options);
 }
+
