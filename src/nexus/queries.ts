@@ -130,11 +130,40 @@ query ResolveGame($domainName: String) {
 }`;
 
 /**
+ * 把搜索框里的内容拆成独立关键词。
+ *
+ * 单关键词用 `WILDCARD` 支持前缀/部分匹配；多关键词不能把整句塞进一个
+ * `WILDCARD`（`*Combat Pathing Revolution*` 是整串字面通配，分词字段匹配不到），
+ * 改用 `MATCHES`：N 网会要求所有词都出现，顺序不限，且按词干匹配。
+ */
+function searchTokens(query: string): string[] {
+  const words = query.match(/[\p{L}\p{N}]+/gu) ?? [];
+  const seen: { [word: string]: true } = {};
+  const tokens: string[] = [];
+
+  for (const word of words) {
+    const key = word.toLowerCase();
+    if (seen[key] === true) {
+      continue;
+    }
+    seen[key] = true;
+    tokens.push(word);
+    // 极端长输入不做无限条件；常见 MOD 名称远少于 8 个词
+    if (tokens.length >= 8) {
+      break;
+    }
+  }
+
+  return tokens;
+}
+
+/**
  * 构造搜索变量。
  *
  * filter 是一棵布尔表达式树：
  *   - `gameDomainName` 精确匹配游戏
- *   - `nameStemmed + WILDCARD` 做词干模糊匹配（比 `name` 更宽容，不区分标点）
+ *   - 单关键词：`nameStemmed + WILDCARD`（支持部分匹配）
+ *   - 多关键词：`nameStemmed + MATCHES`（所有词都要出现，顺序不限，按词干匹配）
  *
  * 关键词为空时不加名称条件，等价于"按排序浏览该游戏"。
  */
@@ -150,12 +179,16 @@ export function buildSearchVariables(options: {
   ];
 
   const keyword = options.query.trim();
-  if (keyword.length > 0) {
-    conditions.push({ nameStemmed: [{ value: keyword, op: "WILDCARD" }] });
+  const tokens = searchTokens(keyword);
+  if (tokens.length === 1) {
+    conditions.push({ nameStemmed: [{ value: tokens[0], op: "WILDCARD" }] });
+  } else if (tokens.length > 1) {
+    // 使用整句而不是 token 数组：MATCHES 的语义就是“所有词都出现、顺序不限”
+    conditions.push({ nameStemmed: [{ value: keyword, op: "MATCHES" }] });
   }
 
   // relevance 只在有关键词时才有意义，否则 Nexus 会返回不稳定顺序
-  const sortField = keyword.length === 0 && options.sortField === "relevance"
+  const sortField = tokens.length === 0 && options.sortField === "relevance"
     ? "endorsements"
     : options.sortField;
 

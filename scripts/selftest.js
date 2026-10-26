@@ -91,8 +91,40 @@ test("有关键词：AND + gameDomainName + nameStemmed(WILDCARD)", () => {
   assert.strictEqual(vars.filter.filter.length, 2);
   assert.strictEqual(vars.filter.filter[0].gameDomainName[0].value, "skyrimspecialedition");
   assert.strictEqual(vars.filter.filter[1].nameStemmed[0].op, "WILDCARD");
+  assert.strictEqual(vars.filter.filter[1].nameStemmed[0].value, "weather");
   assert.deepStrictEqual(vars.sort, [{ relevance: { direction: "DESC" } }]);
   assert.strictEqual(vars.count, 24);
+});
+
+test("多词查询：使用 MATCHES 匹配完整名称", () => {
+  const vars = buildSearchVariables({
+    domain: "skyrimspecialedition",
+    query: "Combat Pathing Revolution",
+    sortField: "relevance",
+    offset: 0,
+    count: 24,
+  });
+  assert.strictEqual(vars.filter.filter.length, 2, "游戏 + 一个 MATCHES 条件");
+  assert.strictEqual(vars.filter.filter[1].nameStemmed[0].op, "MATCHES");
+  assert.strictEqual(
+    vars.filter.filter[1].nameStemmed[0].value,
+    "Combat Pathing Revolution",
+  );
+});
+
+test("多词保留原始查询串，由 N 网负责分词", () => {
+  const vars = buildSearchVariables({
+    domain: "skyrimspecialedition",
+    query: "Combat  combat, Pathing!",
+    sortField: "relevance",
+    offset: 0,
+    count: 24,
+  });
+  assert.strictEqual(vars.filter.filter[1].nameStemmed[0].op, "MATCHES");
+  assert.strictEqual(
+    vars.filter.filter[1].nameStemmed[0].value,
+    "Combat  combat, Pathing!",
+  );
 });
 
 test("空关键词 + relevance → 回退到 endorsements 排序", () => {
