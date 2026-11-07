@@ -132,9 +132,12 @@ query ResolveGame($domainName: String) {
 /**
  * 把搜索框里的内容拆成独立关键词。
  *
- * 单关键词用 `WILDCARD` 支持前缀/部分匹配；多关键词不能把整句塞进一个
- * `WILDCARD`（`*Combat Pathing Revolution*` 是整串字面通配，分词字段匹配不到），
- * 改用 `MATCHES`：N 网会要求所有词都出现，顺序不限，且按词干匹配。
+ * 单关键词用 `WILDCARD OR MATCHES`：`WILDCARD` 保留前缀/部分匹配，
+ * `MATCHES` 负责 N 网把复合名称拆词的情况（例如 `HunterPie` 在
+ * nameStemmed 里不是一个完整的词，单独用 `WILDCARD` 会返回 0）。
+ * 多关键词不能把整句塞进一个 `WILDCARD`（`*Combat Pathing Revolution*`
+ * 是整串字面通配，分词字段匹配不到），改用 `MATCHES`：N 网会要求
+ * 所有词都出现，顺序不限，且按词干匹配。
  */
 function searchTokens(query: string): string[] {
   const words = query.match(/[\p{L}\p{N}]+/gu) ?? [];
@@ -162,7 +165,7 @@ function searchTokens(query: string): string[] {
  *
  * filter 是一棵布尔表达式树：
  *   - `gameDomainName` 精确匹配游戏
- *   - 单关键词：`nameStemmed + WILDCARD`（支持部分匹配）
+ *   - 单关键词：`nameStemmed` 的 `WILDCARD OR MATCHES`
  *   - 多关键词：`nameStemmed + MATCHES`（所有词都要出现，顺序不限，按词干匹配）
  *
  * 关键词为空时不加名称条件，等价于"按排序浏览该游戏"。
@@ -181,7 +184,14 @@ export function buildSearchVariables(options: {
   const keyword = options.query.trim();
   const tokens = searchTokens(keyword);
   if (tokens.length === 1) {
-    conditions.push({ nameStemmed: [{ value: tokens[0], op: "WILDCARD" }] });
+    // 两种 op 取并集：既支持 "HunterP" 这种前缀，也支持 "HunterPie" 这种被拆词的复合名
+    conditions.push({
+      op: "OR",
+      filter: [
+        { nameStemmed: [{ value: tokens[0], op: "WILDCARD" }] },
+        { nameStemmed: [{ value: tokens[0], op: "MATCHES" }] },
+      ],
+    });
   } else if (tokens.length > 1) {
     // 使用整句而不是 token 数组：MATCHES 的语义就是“所有词都出现、顺序不限”
     conditions.push({ nameStemmed: [{ value: keyword, op: "MATCHES" }] });

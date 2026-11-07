@@ -79,7 +79,7 @@ async function testAsync(name, fn) {
 // 2) 纯函数
 // ---------------------------------------------------------------------------
 console.log("\n[1] 查询变量构造");
-test("有关键词：AND + gameDomainName + nameStemmed(WILDCARD)", () => {
+test("单关键词：AND + gameDomainName + (WILDCARD OR MATCHES)", () => {
   const vars = buildSearchVariables({
     domain: "skyrimspecialedition",
     query: "weather",
@@ -90,10 +90,28 @@ test("有关键词：AND + gameDomainName + nameStemmed(WILDCARD)", () => {
   assert.strictEqual(vars.filter.op, "AND");
   assert.strictEqual(vars.filter.filter.length, 2);
   assert.strictEqual(vars.filter.filter[0].gameDomainName[0].value, "skyrimspecialedition");
-  assert.strictEqual(vars.filter.filter[1].nameStemmed[0].op, "WILDCARD");
-  assert.strictEqual(vars.filter.filter[1].nameStemmed[0].value, "weather");
+  assert.strictEqual(vars.filter.filter[1].op, "OR");
+  assert.deepStrictEqual(
+    vars.filter.filter[1].filter.map((c) => [c.nameStemmed[0].op, c.nameStemmed[0].value]),
+    [["WILDCARD", "weather"], ["MATCHES", "weather"]],
+  );
   assert.deepStrictEqual(vars.sort, [{ relevance: { direction: "DESC" } }]);
   assert.strictEqual(vars.count, 24);
+});
+
+test("复合单词 HunterPie 同时走 WILDCARD / MATCHES", () => {
+  const vars = buildSearchVariables({
+    domain: "monsterhunterworld",
+    query: "HunterPie",
+    sortField: "relevance",
+    offset: 0,
+    count: 24,
+  });
+  assert.strictEqual(vars.filter.filter[1].op, "OR");
+  assert.deepStrictEqual(
+    vars.filter.filter[1].filter.map((c) => [c.nameStemmed[0].op, c.nameStemmed[0].value]),
+    [["WILDCARD", "HunterPie"], ["MATCHES", "HunterPie"]],
+  );
 });
 
 test("多词查询：使用 MATCHES 匹配完整名称", () => {
