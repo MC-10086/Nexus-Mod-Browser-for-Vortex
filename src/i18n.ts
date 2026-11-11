@@ -58,6 +58,11 @@ const EN = {
   "card.viewPageTitle": "Open on Nexus Mods",
   "card.detailsTitle": "Show mod details",
 
+  "uploader.open": "View mods uploaded by {name} in this game",
+  "uploader.title": "Mods uploaded by {name}",
+  "uploader.loading": "Loading mods…",
+  "uploader.empty": "This uploader has no mods in this game.",
+
   "detail.fallbackTitle": "Mod details",
   "detail.empty": "This mod has no description.",
   "detail.downloads": "{count} downloads",
@@ -182,6 +187,11 @@ const ZH: Record<MessageKey, string> = {
   "card.viewPageTitle": "在 Nexus Mods 打开",
   "card.detailsTitle": "查看 MOD 详情",
 
+  "uploader.open": "查看 {name} 在当前游戏上传的 MOD",
+  "uploader.title": "{name} 上传的 MOD",
+  "uploader.loading": "正在加载 MOD…",
+  "uploader.empty": "该上传者在当前游戏没有 MOD。",
+
   "detail.fallbackTitle": "MOD 详情",
   "detail.empty": "该 MOD 未提供简介。",
   "detail.downloads": "{count} 次下载",
@@ -303,6 +313,11 @@ const JA: Record<MessageKey, string> = {
   "card.downloadTitle": "ダウンロードしてインストール",
   "card.viewPageTitle": "Nexus Mods で開く",
   "card.detailsTitle": "MOD の詳細を表示",
+
+  "uploader.open": "{name} がこのゲームに投稿した MOD を表示",
+  "uploader.title": "{name} が投稿した MOD",
+  "uploader.loading": "MOD を読み込み中…",
+  "uploader.empty": "この投稿者はこのゲームの MOD を投稿していません。",
 
   "detail.fallbackTitle": "MOD の詳細",
   "detail.empty": "この MOD には説明がありません。",

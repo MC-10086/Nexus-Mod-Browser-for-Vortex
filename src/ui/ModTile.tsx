@@ -39,6 +39,7 @@ interface IModTileProps {
   onViewPage?: () => void;
   /** 打开详情弹窗（可选：不传就不渲染 Details 按钮） */
   onDetails?: () => void;
+  onUploader?: (id: number, name: string) => void;
 }
 
 function Stat(props: { icon: IconName; children: any }) {
@@ -51,8 +52,10 @@ function Stat(props: { icon: IconName; children: any }) {
 }
 
 export default function ModTile(props: IModTileProps) {
-  const { mod, category, installed, busy, onPrefetch, onDownload, onViewPage, onDetails } = props;
-  const author = mod.uploader?.name ?? mod.author ?? "unknown";
+  const { mod, category, installed, busy, onPrefetch, onDownload, onViewPage, onDetails, onUploader } = props;
+  const uploaderName = mod.uploader?.name;
+  const uploaderId = mod.uploader?.memberId;
+  const author = uploaderName ?? mod.author ?? "unknown";
 
   return (
     <div
@@ -85,7 +88,18 @@ export default function ModTile(props: IModTileProps) {
 
             <p className="flex items-center gap-x-1 text-body-sm text-neutral-moderate">
               <span className="size-4 overflow-hidden rounded-full bg-surface-translucent-low" />
-              {author}
+              {onUploader !== undefined && Number.isSafeInteger(uploaderId) && uploaderId > 0 && uploaderName?.trim()
+                ? (
+                  <button
+                    type="button"
+                    className="min-w-0 truncate text-left text-info-strong underline"
+                    title={t("uploader.open", { name: uploaderName })}
+                    onClick={() => onUploader(uploaderId, uploaderName)}
+                  >
+                    {uploaderName}
+                  </button>
+                )
+                : author}
             </p>
           </div>
 

@@ -82,11 +82,16 @@ export class NexusService {
 
     const promise = loader()
       .then((value) => {
-        this.cache.set(key, { at: Date.now(), ttl, value });
+        // clear() 会移除旧请求的登记。它仍可完成，但不能再更新共享缓存。
+        if (this.inflight.get(key) === promise) {
+          this.cache.set(key, { at: Date.now(), ttl, value });
+        }
         return value;
       })
       .finally(() => {
-        this.inflight.delete(key);
+        if (this.inflight.get(key) === promise) {
+          this.inflight.delete(key);
+        }
       });
 
     this.inflight.set(key, promise);
@@ -118,6 +123,9 @@ export class NexusService {
    */
   public search(options: ISearchOptions): Promise<ISearchResult> {
     const variables = buildSearchVariables(options);
+    if (variables === undefined) {
+      return Promise.resolve({ totalCount: 0, nodes: [] });
+    }
     const key = `search:${JSON.stringify(variables)}`;
 
     return this.load<ISearchResult>(key, CACHE_TTL_MS, async () => {

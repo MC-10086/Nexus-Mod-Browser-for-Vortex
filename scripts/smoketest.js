@@ -756,8 +756,65 @@ const DETAIL = {
   i18n.setLanguage("zh");
 }
 
+// 上传者账号是入口，作者署名在缺少账号 ID 时仍只作为文字显示。
+{
+  const ModTile = require("../dist/ui/ModTile.js").default;
+  const uploader = { name: "原文上传者", memberId: 42 };
+  const mod = { ...MODS[0], author: "署名作者", uploader };
+  const opened = [];
+  const onUploader = (...args) => opened.push(args);
+  const entry = (tree) => findAll(tree, (el) => el.type === "button" && textOf(el).trim() === uploader.name);
+  const links = entry(ModTile({ mod, onUploader }));
+  assert.strictEqual(links.length, 1);
+  links[0].props.onClick();
+  assert.deepStrictEqual(opened, [[42, uploader.name]]);
+  assert.strictEqual(entry(ModTile({ mod: { ...mod, uploader: { name: uploader.name } }, onUploader })).length, 0);
+}
+
+// 模拟作品查询完成后的渲染，验证行按钮与分页参数。
+{
+  const UploaderModsDialog = require("../dist/ui/UploaderModsDialog.js").default;
+  const mod = { ...MODS[0], summary: "原文作品简介" };
+  const request = { page: 1 };
+  const actions = [];
+  const originalUseState = React.useState;
+  const originalUseEffect = React.useEffect;
+  React.useState = (initial) => initial?.page === 1
+    ? [request, (next) => actions.push(["page", next.page])]
+    : [{ request, result: { totalCount: 25, nodes: [mod] } }, () => {}];
+  React.useEffect = () => {};
+  let tree;
+  try {
+    tree = UploaderModsDialog({
+      uploaderName: "原文上传者",
+      gameName: "Skyrim Special Edition",
+      blocked: false,
+      busyMods: [],
+      onDownload: (item) => actions.push(["download", item.modId]),
+      onViewPage: (item) => actions.push(["view", item.modId]),
+      onDetails: (item) => actions.push(["details", item.modId]),
+    });
+  } finally {
+    React.useState = originalUseState;
+    React.useEffect = originalUseEffect;
+  }
+  assert.ok(textOf(tree).includes("原文上传者"));
+  assert.ok(textOf(tree).includes("Skyrim Special Edition"));
+  const rows = findAll(tree, (el) => el.props?.["data-testid"] === "uploader-mod-row");
+  assert.strictEqual(rows.length, 1);
+  assert.ok(textOf(rows[0]).includes(mod.summary));
+  const buttons = findAll(rows[0], (el) => el.type === "button");
+  assert.strictEqual(buttons.length, 3);
+  buttons.forEach((el) => el.props.onClick());
+  assert.deepStrictEqual(actions, [["download", mod.modId], ["view", mod.modId], ["details", mod.modId]]);
+  const pageTwo = findAll(tree, (el) => el.type === "button" && textOf(el).trim() === "2")[0];
+  assert.ok(pageTwo);
+  pageTwo.props.onClick();
+  assert.deepStrictEqual(actions.at(-1), ["page", 2]);
+}
+
 console.log("冒烟测试通过：");
 console.log(`  reducer 路径 : ${sliceReducer ? sliceReducer.pathParts.join(".") : "?"}`);
 console.log(`  页面         : ${page.title}（id=${page.options.id}, group=${page.options.group}）`);
 console.log("  导航图标     : 镜像搜索图标（mdi path）");
-console.log("  渲染场景     : 有数据 / 加载中 / 错误 / 切换游戏 / 详情就绪 / 详情加载 / 详情错误 / 空简介 / 前置弹窗");
+console.log("  渲染场景     : 有数据 / 加载中 / 错误 / 切换游戏 / 详情就绪 / 详情加载 / 详情错误 / 空简介 / 前置弹窗 / 上传者作品");

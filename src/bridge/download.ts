@@ -25,7 +25,7 @@
  */
 
 import { t } from "../i18n";
-import { isNexusModInstalled } from "../util/mods";
+import { downloadRecordGame, isNexusModInstalled } from "../util/mods";
 import { modFilePageUrl, openExternal } from "../util/openExternal";
 
 /** 一次下载请求所需的全部信息 */
@@ -95,39 +95,23 @@ function isAlreadyDownloaded(err: any): boolean {
   return err?.name === "AlreadyDownloaded" || /alreadydownloaded/i.test(String(err?.name ?? ""));
 }
 
-/**
- * 在 store 里找这次请求对应的下载记录。
- *
- * ⚠️ modInfo 有两种形状（都真实存在）：
- *   1) 我们 emit 时传的：{ game, name, modId, fileId }            ← 顶层
- *   2) 宿主从 nxm 链接下载时（免费账号走网页授权后）： 
- *      { game, source:"nexus", name, nexus: { ids: { gameId, modId, fileId }, ... } }
- * 第二种没有顶层的 modId/fileId，只按顶层匹配会永远找不到记录（Downloading… 不触发就是这个原因）。
- * 另外 id 可能是字符串，比较时统一转数字。
- */
-function findDownloadRecord(api: any, modId: number, fileId: number): any {
+function downloadFiles(api: any): Record<string, any> {
   try {
-    const files = api.getState()?.persistent?.downloads?.files ?? {};
-    for (const id of Object.keys(files)) {
-      const info = files[id]?.modInfo;
-      if (info === undefined || info === null) {
-        continue;
-      }
-      const nested = info.nexus?.ids;
-      const sameTop =
-        Number(info.modId) === Number(modId) && Number(info.fileId) === Number(fileId);
-      const sameNested =
-        nested !== undefined &&
-        Number(nested.modId) === Number(modId) &&
-        Number(nested.fileId) === Number(fileId);
-      if (sameTop || sameNested) {
-        return { id, record: files[id] };
-      }
-    }
+    return api.getState()?.persistent?.downloads?.files ?? {};
   } catch {
-    /* 读 store 失败不影响主流程 */
+    return {};
   }
-  return undefined;
+}
+
+/** 同时兼容插件的顶层 ID 和宿主 nxm 下载的 nexus.ids。 */
+function matchesDownload(record: any, request: IDownloadRequest): boolean {
+  if (downloadRecordGame(record) !== request.internalGameId) {
+    return false;
+  }
+  const info = record.modInfo;
+  const matchesIds = (ids: any) =>
+    Number(ids?.modId) === Number(request.modId) && Number(ids?.fileId) === Number(request.fileId);
+  return matchesIds(info) || matchesIds(info?.nexus?.ids);
 }
 
 /** 授权弹窗队列里是否有这条链接（兼容 session.nexus.* 与旧结构） */
@@ -192,8 +176,7 @@ async function installDownloaded(
 
 interface IWatchOptions {
   api: any;
-  modId: number;
-  fileId: number;
+  request: IDownloadRequest;
   startTimeoutMs: number;
   pollIntervalMs: number;
   onStarted?: (downloadId?: string) => void;
@@ -202,7 +185,7 @@ interface IWatchOptions {
   /** 每个轮询周期检查一次：返回 true 就立刻停止等待（被新的点击作废） */
   cancel?: () => boolean;
   /**
-   * 监听挂上之后执行的一次性动作（emit start-download）。
+   * 监听挂上之后执行的一次性动作（通知宿主或打开浏览器）。
    * 用 kickoff 而不是外面 Promise.race，是为了保证**只有一个**轮询定时器，
    * 谁先结束都在同一处 clearInterval（否则 race 的败者会泄漏 interval，进程不退出）。
    */
@@ -215,16 +198,20 @@ interface IWatchOptions {
 type WatchResult = IDownloadOutcome;
 
 function watchDownloadRecord(options: IWatchOptions): Promise<WatchResult> {
-  const { api, modId, fileId, startTimeoutMs, pollIntervalMs, onStarted, nxmUrl, kickoff, cancel } =
+  const { api, request, startTimeoutMs, pollIntervalMs, onStarted, nxmUrl, kickoff, cancel } =
     options;
 
   return new Promise<WatchResult>((resolve) => {
     const startedAt = Date.now();
     let settled = false;
     let watchTimer: any;
-    let sawRecord = false;
+    let watchedId: string | undefined;
     let sawQueueEntry = false;
     let reportedStart = false;
+    // 旧失败记录不属于本次请求。同一个 ID 恢复下载后仍然可以认领。
+    const previouslyFailed = new Set(Object.entries(downloadFiles(api))
+      .filter(([, record]) => record?.state === "failed" && matchesDownload(record, request))
+      .map(([id]) => id));
 
     const reportStarted = (downloadId?: string) => {
       if (!reportedStart) {
@@ -249,15 +236,19 @@ function watchDownloadRecord(options: IWatchOptions): Promise<WatchResult> {
       resolve(outcome);
     };
 
-    watchTimer = setInterval(() => {
+    const isInactive = () => {
       if (settled) {
-        clearInterval(watchTimer);
-        return;
+        return true;
       }
-
-      // 被外部作废（用户又点了一次 Download）→ 立即收工，不发通知也不安装
-      if (cancel !== undefined && cancel()) {
+      if (cancel?.()) {
         finish({ canceled: true });
+        return true;
+      }
+      return false;
+    };
+
+    watchTimer = setInterval(() => {
+      if (isInactive()) {
         return;
       }
 
@@ -269,24 +260,39 @@ function watchDownloadRecord(options: IWatchOptions): Promise<WatchResult> {
         }
       }
 
-      const found = findDownloadRecord(api, modId, fileId);
-      if (found !== undefined) {
-        sawRecord = true;
-        reportStarted(found.id);
-        const state = found.record?.state;
-        if (state === "finished") {
-          finish({ downloadId: found.id });
-          return;
+      const files = downloadFiles(api);
+      if (watchedId === undefined) {
+        let newlyFailed = false;
+        for (const [id, record] of Object.entries(files)) {
+          if (!matchesDownload(record, request)) {
+            continue;
+          }
+          if (record.state !== "failed") {
+            watchedId = id;
+            break;
+          }
+          if (!previouslyFailed.has(id)) {
+            newlyFailed = true;
+          }
         }
-        if (state === "failed") {
+        if (watchedId === undefined && newlyFailed) {
           finish({});
           return;
         }
-        return; // 正在下载
       }
 
-      if (sawRecord) {
-        finish({ canceled: true }); // 记录被删掉了
+      if (watchedId !== undefined) {
+        const record = files[watchedId];
+        if (!matchesDownload(record, request)) {
+          finish({ canceled: true });
+        } else if (record.state === "failed") {
+          finish({});
+        } else {
+          reportStarted(watchedId);
+          if (record.state === "finished") {
+            finish({ downloadId: watchedId });
+          }
+        }
         return;
       }
 
@@ -305,6 +311,9 @@ function watchDownloadRecord(options: IWatchOptions): Promise<WatchResult> {
       try {
         kickoff({
           onError: (err: any) => {
+            if (isInactive()) {
+              return;
+            }
             if (isUserCanceled(err)) {
               finish({ canceled: true });
               return;
@@ -317,6 +326,14 @@ function watchDownloadRecord(options: IWatchOptions): Promise<WatchResult> {
             finish({});
           },
           onDownloadId: (downloadId?: string) => {
+            if (isInactive()) {
+              return;
+            }
+            const record = downloadId === undefined ? undefined : downloadFiles(api)[downloadId];
+            const game = downloadRecordGame(record);
+            if (game !== undefined && game !== request.internalGameId) {
+              return;
+            }
             reportStarted(downloadId);
             finish({ downloadId });
           },
@@ -352,8 +369,7 @@ export function downloadModFile(
   // 监听先挂上，再 emit（kickoff），保证只有一个轮询定时器、结束即清理
   return watchDownloadRecord({
     api,
-    modId: request.modId,
-    fileId: request.fileId,
+    request,
     startTimeoutMs,
     pollIntervalMs: options?.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS,
     onStarted: options?.onStarted,
@@ -397,21 +413,21 @@ export function downloadViaBrowser(
   const startTimeoutMs = options?.startTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
   const openBrowser = options?.openBrowser ?? ((url: string) => openExternal(url));
 
-  // 直接打开文件页：网页上点 "Mod manager download" 会把带 key 的 nxm 链接交回 Vortex
-  try {
-    openBrowser(modFilePageUrl(request.domain, request.modId, request.fileId));
-  } catch {
-    /* 打不开浏览器就靠超时收尾 */
-  }
-
   return watchDownloadRecord({
     api,
-    modId: request.modId,
-    fileId: request.fileId,
+    request,
     startTimeoutMs,
     pollIntervalMs: options?.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS,
     onStarted: options?.onStarted,
     cancel: options?.cancel,
+    kickoff: () => {
+      // 网页上的 "Mod manager download" 会把带 key 的 nxm 链接交回 Vortex。
+      try {
+        openBrowser(modFilePageUrl(request.domain, request.modId, request.fileId));
+      } catch {
+        /* 打不开浏览器就靠超时收尾 */
+      }
+    },
   }).then(async (outcome) => {
     if (outcome.downloadId === undefined) {
       return outcome;

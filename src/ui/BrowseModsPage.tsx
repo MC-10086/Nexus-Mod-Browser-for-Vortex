@@ -30,7 +30,7 @@ import { describeError } from "../nexus/client";
 import { getNexusService, resetNexusService } from "../nexus/index";
 import { actions, nexusBrowserSlice } from "../state/reducer";
 import { manualRequirementIds, prefsActions, prefsLanguage } from "../state/prefs";
-import { IModDetail, IModSummary } from "../types";
+import { IModDetail, IModFile, IModSummary } from "../types";
 import { activeGameId, gameName, isPremium, nexusDomain } from "../util/game";
 import { installedNexusModIds, installedNexusMods } from "../util/mods";
 import { gameModsUrl, modPageUrl, openExternal } from "../util/openExternal";
@@ -40,6 +40,7 @@ import {
 } from "../util/requirements";
 import ModDetailDialog from "./ModDetailDialog";
 import ModTile from "./ModTile";
+import UploaderModsDialog from "./UploaderModsDialog";
 import RequirementsDialog, {
   IRequirementsDecision,
   IRequirementsDialogData,
@@ -59,8 +60,8 @@ interface IBrowseModsPageProps {
   api: any;
 }
 
-interface IRequirementDetailState {
-  row: IRequirementRow;
+interface IOverlayDetailState {
+  target: { domain: string; modId: number; name: string; summary?: IModSummary };
   detail?: IModDetail;
   error?: string;
 }
@@ -114,15 +115,16 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
   const requirementsResolveRef = React.useRef<
     ((decision: IRequirementsDecision) => void) | undefined
   >(undefined);
-  /**
-   * 正在查前置/等用户在弹窗里做选择的 MOD。
-   * 防止免费账号在弹窗还没出来时重复点 Download，把 Promise 桥接覆盖掉。
-   */
-  const requirementsInFlightRef = React.useRef<number[]>([]);
-  /** 前置的详情弹窗（叠加在前置弹窗之上） */
-  const [requirementDetail, setRequirementDetail] = React.useState<
-    IRequirementDetailState | undefined
-  >(undefined);
+  // 同一时间只为一个下载准备文件，避免覆盖前置窗口的等待回调。
+  const preparingDownloadRef = React.useRef<object | undefined>(undefined);
+  const [nativePickerOpen, setNativePickerOpen] = React.useState(false);
+  const [uploader, setUploader] = React.useState<{
+    id: number;
+    name: string;
+    domain: string;
+    gameId: string;
+  } | undefined>(undefined);
+  const [overlayDetail, setOverlayDetail] = React.useState<IOverlayDetailState | undefined>(undefined);
 
   // 订阅 store：只有我们的切片引用变了才重渲染
   React.useEffect(() => {
@@ -149,6 +151,16 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
   const state = api.getState();
   const gameId = activeGameId(state);
   const domain = nexusDomain(state, gameId);
+  const activeUploader = uploader?.gameId === gameId && uploader?.domain === domain ? uploader : undefined;
+
+  React.useEffect(() => {
+    setUploader(undefined);
+    setOverlayDetail(undefined);
+    setRequirements(undefined);
+    const resolve = requirementsResolveRef.current;
+    requirementsResolveRef.current = undefined;
+    resolve?.({ kind: "cancel", selected: [], ignored: [] });
+  }, [gameId, domain]);
   /** 已安装的 Nexus mod id（按 Vortex 自己的 attributes.modId 判定，不靠名字） */
   const installedIds = installedNexusModIds(state, gameId);
 
@@ -290,46 +302,30 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
     const resolve = requirementsResolveRef.current;
     requirementsResolveRef.current = undefined;
     setRequirements(undefined);
-    setRequirementDetail(undefined);
+    setOverlayDetail(undefined);
     resolve?.(decision);
   };
 
   // ---------------------------------------------------------------------------
-  // 前置详情：叠加在地前置弹窗之上，复用详情弹窗组件
+  // 作品与前置共用详情弹窗，保留下方列表及其滚动位置。
   // ---------------------------------------------------------------------------
 
-  const openRequirementDetail = (row: IRequirementRow) => {
-    const current = api.getState();
-    const internalGameId = activeGameId(current);
-    const currentDomain = nexusDomain(current, internalGameId);
-
-    if (currentDomain === undefined || row.modId <= 0) {
-      return;
-    }
-
-    setRequirementDetail({ row });
+  const openOverlayDetail = (target: IOverlayDetailState["target"]) => {
+    setOverlayDetail({ target });
 
     getNexusService(api)
-      .modDetail(currentDomain, row.modId)
+      .modDetail(target.domain, target.modId)
       .then((detail) => {
-        setRequirementDetail((prev) =>
-          prev !== undefined && prev.row.modId === row.modId
-            ? { row, detail }
-            : prev,
-        );
+        setOverlayDetail((prev) => prev?.target === target ? { target, detail } : prev);
       })
       .catch((err) => {
-        setRequirementDetail((prev) =>
-          prev !== undefined && prev.row.modId === row.modId
-            ? { row, error: describeError(err) }
-            : prev,
-        );
+        setOverlayDetail((prev) => prev?.target === target ? { target, error: describeError(err) } : prev);
       });
   };
 
-  const retryRequirementDetail = () => {
-    if (requirementDetail !== undefined) {
-      openRequirementDetail(requirementDetail.row);
+  const openRequirementDetail = (row: IRequirementRow) => {
+    if (domain !== undefined && row.modId > 0) {
+      openOverlayDetail({ domain, modId: row.modId, name: row.name });
     }
   };
 
@@ -367,8 +363,7 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
       return;
     }
 
-    // 前置查询/弹窗进行中：同一 MOD 不允许再开一条流程（会覆盖 Promise 桥接）
-    if (requirementsInFlightRef.current.indexOf(mod.modId) !== -1) {
+    if (busyMods.includes(mod.modId) || preparingDownloadRef.current !== undefined) {
       return;
     }
 
@@ -392,65 +387,77 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
       attemptRef.current[mod.modId] = attempt;
     }
 
+    const preparation = {};
+    preparingDownloadRef.current = preparation;
+    const isSameGame = () => {
+      const latest = api.getState();
+      return activeGameId(latest) === internalGameId && nexusDomain(latest, internalGameId) === currentDomain;
+    };
     try {
       // ---- 前置检查（best-effort）----------------------------------------
       // 查询失败 / 超时 / 限流一律返回 undefined → 不弹窗，直接走原来的下载流程。
       let requirementsToDownload: IRequirementRow[] = [];
-      requirementsInFlightRef.current = requirementsInFlightRef.current.concat([mod.modId]);
-      try {
-        const promptData = await buildRequirementsPromptData(api, {
-          domain: currentDomain,
-          internalGameId,
-          modId: mod.modId,
-          modName: mod.name,
-          installed: installedNexusMods(current, internalGameId),
-          manual: manualRequirementIds(current, currentDomain),
-        });
+      const promptData = await buildRequirementsPromptData(api, {
+        domain: currentDomain,
+        internalGameId,
+        modId: mod.modId,
+        modName: mod.name,
+        installed: installedNexusMods(current, internalGameId),
+        manual: manualRequirementIds(current, currentDomain),
+      });
 
-        if (promptData !== undefined) {
-          const decision = await askRequirements(promptData);
+      if (!isSameGame()) {
+        return;
+      }
+      if (promptData !== undefined) {
+        const decision = await askRequirements(promptData);
 
-          if (decision.kind === "cancel") {
-            return;
-          }
-
-          // "不再提醒"是显式勾选：不管是 Download 还是 Skip，都按最终状态持久化差集
-          const originalIgnored = promptData.rows
-            .filter((row) => row.kind === "manual")
-            .map((row) => row.modId);
-          const { mark, unmark } = diffIgnoredMarks(originalIgnored, decision.ignored);
-          for (const id of mark) {
-            api.store.dispatch(prefsActions.markManualRequirement(currentDomain, id));
-          }
-          for (const id of unmark) {
-            api.store.dispatch(prefsActions.unmarkManualRequirement(currentDomain, id));
-          }
-
-          if (decision.kind === "download") {
-            const wanted = new Set(decision.selected);
-            requirementsToDownload = promptData.rows.filter(
-              (row) =>
-                (row.kind === "missing" || row.kind === "manual") &&
-                wanted.has(row.modId),
-            );
-          }
-          // kind === "skip"：不下载前置，但"不再提醒"的勾选照常生效
+        if (decision.kind === "cancel") {
+          return;
         }
-      } finally {
-        requirementsInFlightRef.current = requirementsInFlightRef.current.filter(
-          (id) => id !== mod.modId,
-        );
+
+        // "不再提醒"是显式勾选：不管是 Download 还是 Skip，都按最终状态持久化差集
+        const originalIgnored = promptData.rows
+          .filter((row) => row.kind === "manual")
+          .map((row) => row.modId);
+        const { mark, unmark } = diffIgnoredMarks(originalIgnored, decision.ignored);
+        for (const id of mark) {
+          api.store.dispatch(prefsActions.markManualRequirement(currentDomain, id));
+        }
+        for (const id of unmark) {
+          api.store.dispatch(prefsActions.unmarkManualRequirement(currentDomain, id));
+        }
+
+        if (decision.kind === "download") {
+          const wanted = new Set(decision.selected);
+          requirementsToDownload = promptData.rows.filter(
+            (row) =>
+              (row.kind === "missing" || row.kind === "manual") &&
+              wanted.has(row.modId),
+          );
+        }
+        // kind === "skip"：不下载前置，但"不再提醒"的勾选照常生效
       }
 
       const files = await getNexusService(api).modFiles(currentDomain, mod.modId);
+      if (!isSameGame()) {
+        return;
+      }
       if (files.length === 0) {
         notify(api, "error", t("notify.noFiles"));
         return;
       }
 
       // 只认 MAIN 文件；有多个 MAIN 时弹原生对话框让用户选（见 ui/chooseFile.ts）
-      const file = await chooseModFile(api, mod.name, files);
-      if (file === undefined) {
+      setNativePickerOpen(true);
+      let file: IModFile | undefined;
+      try {
+        file = await chooseModFile(api, mod.name, files);
+      } finally {
+        setNativePickerOpen(false);
+      }
+      preparingDownloadRef.current = undefined;
+      if (file === undefined || !isSameGame()) {
         // 用户在选文件弹窗里点了取消 —— 什么都不做
         return;
       }
@@ -518,11 +525,16 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
     } catch (err) {
       notify(api, "error", t("notify.downloadFailed", { error: describeError(err as any) }));
     } finally {
+      if (preparingDownloadRef.current === preparation) {
+        preparingDownloadRef.current = undefined;
+      }
       pendingRef.current = pendingRef.current.filter((id) => id !== mod.modId);
       if (attempt !== undefined && attemptRef.current[mod.modId] === attempt) {
         delete attemptRef.current[mod.modId];
       }
-      setBusyMods((prev) => prev.filter((id) => id !== mod.modId));
+      if (!attempt?.canceled) {
+        setBusyMods((prev) => prev.filter((id) => id !== mod.modId));
+      }
     }
   };
 
@@ -622,6 +634,11 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
             }}
             onViewPage={() => openExternal(modPageUrl(domain, mod.modId))}
             onDetails={() => openDetail(mod)}
+            onUploader={(id, name) => {
+              if (gameId !== undefined && domain === slice.domain) {
+                setUploader({ id, name, gameId, domain });
+              }
+            }}
           />
         ))}
       </div>
@@ -729,6 +746,25 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
         )
         : null}
 
+      {activeUploader !== undefined && (
+        <UploaderModsDialog
+          key={activeUploader.gameId + ":" + activeUploader.id}
+          api={api}
+          domain={activeUploader.domain}
+          gameName={gameName(state, activeUploader.gameId)}
+          uploaderId={activeUploader.id}
+          uploaderName={activeUploader.name}
+          busyMods={busyMods}
+          blocked={requirements !== undefined || overlayDetail !== undefined || nativePickerOpen}
+          onClose={() => setUploader(undefined)}
+          onDownload={(mod) => void handleDownload(mod)}
+          onViewPage={(mod) => openExternal(modPageUrl(activeUploader.domain, mod.modId))}
+          onDetails={(mod) => openOverlayDetail({
+            domain: activeUploader.domain, modId: mod.modId, name: mod.name, summary: mod,
+          })}
+        />
+      )}
+
       {/* 前置弹窗：由 Download 流程通过 Promise 打开，关闭后才继续下载 */}
       {requirements !== undefined
         ? (
@@ -738,23 +774,21 @@ export default function BrowseModsPage(props: IBrowseModsPageProps) {
             onDownloadOne={handleRequirementDownloadOne}
             onViewPage={handleRequirementViewPage}
             onDetails={openRequirementDetail}
-            escDisabled={requirementDetail !== undefined}
+            escDisabled={overlayDetail !== undefined}
           />
         )
         : null}
 
-      {/* 前置详情：叠在前置弹窗之上；ESC 只关这一层 */}
-      {requirementDetail !== undefined
-        ? (
-          <ModDetailDialog
-            title={requirementDetail.row.name}
-            detail={requirementDetail.detail}
-            error={requirementDetail.error}
-            onClose={() => setRequirementDetail(undefined)}
-            onRetry={retryRequirementDetail}
-          />
-        )
-        : null}
+      {overlayDetail !== undefined && overlayDetail.target.domain === domain && (
+        <ModDetailDialog
+          summary={overlayDetail.target.summary}
+          title={overlayDetail.target.name}
+          detail={overlayDetail.detail}
+          error={overlayDetail.error}
+          onClose={() => setOverlayDetail(undefined)}
+          onRetry={() => openOverlayDetail({ ...overlayDetail.target })}
+        />
+      )}
     </MainPage>
   );
 }

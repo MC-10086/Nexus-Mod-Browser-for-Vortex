@@ -28,7 +28,7 @@ export interface IModSummary {
   /** 小缩略图；主图和大缩略图都缺失时作为候选（详情查询有，列表查询没查） */
   thumbnailUrl?: string;
   game?: { domainName?: string; id?: string };
-  uploader?: { name?: string };
+  uploader?: { name?: string; memberId?: number } | null;
 }
 
 /** 详情（对应 GraphQL `mod()`） */
@@ -100,6 +100,7 @@ export interface ISearchOptions {
   query: string;
   /** ModsSort 字段名 */
   sortField: string;
+  uploaderId?: number;
   /** 0-based */
   offset: number;
   count: number;

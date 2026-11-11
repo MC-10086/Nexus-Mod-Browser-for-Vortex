@@ -94,15 +94,10 @@ function buildRow(input: IBuildRowsInput, requirement: any): IRequirementRow | u
     (isExternal ? t("status.external") : t("requirements.unnamedMod", { modId }));
   const notes = decodeText(requirement?.notes) || undefined;
 
-  if (!isExternal && modId === selfModId) {
+  const crossGame = String(requirement?.gameId ?? info.gameNumericId) !== String(info.gameNumericId);
+  if (!isExternal && !crossGame && modId === selfModId) {
     return undefined; // 自己依赖自己，忽略
   }
-
-  const crossGame =
-    !isExternal &&
-    requirement?.gameId !== undefined &&
-    requirement?.gameId !== null &&
-    String(requirement.gameId) !== String(info.gameNumericId);
 
   if (isExternal) {
     const url = typeof requirement?.url === "string" && requirement.url.trim().length > 0
@@ -163,11 +158,11 @@ const KIND_ORDER: { [kind in RequirementKind]: number } = {
 
 /**
  * 生成弹窗行（已按"要处理的优先"排序：未安装 → 手动 → 已安装 → 站外 → 其他游戏）。
- * 同一个 modId 只保留一条。
+ * 同一个游戏内的同一个 modId 只保留一条。
  */
 export function buildRequirementRows(input: IBuildRowsInput): IRequirementRow[] {
   const rows: IRequirementRow[] = [];
-  const seen = new Set<number>();
+  const seen = new Set<string>();
 
   for (const requirement of input.info.nexus) {
     const row = buildRow(input, requirement);
@@ -175,10 +170,11 @@ export function buildRequirementRows(input: IBuildRowsInput): IRequirementRow[] 
       continue;
     }
     if (row.modId > 0) {
-      if (seen.has(row.modId)) {
+      const key = `${requirement?.gameId ?? input.info.gameNumericId}:${row.modId}`;
+      if (seen.has(key)) {
         continue;
       }
-      seen.add(row.modId);
+      seen.add(key);
     }
     rows.push(row);
   }

@@ -24,7 +24,7 @@ import {
   IRequirementRow,
 } from "../util/requirements";
 import { pickPrimaryFile } from "../util/modFiles";
-import { IInstalledNexusMod } from "../util/mods";
+import { downloadRecordGame, IInstalledNexusMod } from "../util/mods";
 import { notify } from "./notify";
 import { IRequirementsDialogData } from "./RequirementsDialog";
 
@@ -117,7 +117,7 @@ export async function startRequirementDownload(
     return false;
   }
 
-  if (hasDownloadRecord(api, row.modId)) {
+  if (hasDownloadRecord(api, context.internalGameId, row.modId)) {
     return true; // 已经在下载列表里，视为已请求
   }
 
@@ -160,7 +160,7 @@ interface IRequirementDownloadResult {
  * 这个 MOD 是否已经在 Vortex 下载列表里（含已完成但还没装的）。
  * 避免重复 emit 触发宿主的 AlreadyDownloaded 提示。
  */
-function hasDownloadRecord(api: any, modId: number): boolean {
+function hasDownloadRecord(api: any, internalGameId: string, modId: number): boolean {
   try {
     const files = api.getState()?.persistent?.downloads?.files ?? {};
     for (const key of Object.keys(files)) {
@@ -170,7 +170,8 @@ function hasDownloadRecord(api: any, modId: number): boolean {
       }
       const info = record.modInfo;
       const candidate = Number(info?.modId ?? info?.nexus?.ids?.modId);
-      if (candidate === modId && record.state !== "failed") {
+      // MOD ID 只在同一游戏内唯一。优先使用 modInfo 里的下载目标。
+      if (downloadRecordGame(record) === internalGameId && candidate === modId && record.state !== "failed") {
         return true;
       }
     }

@@ -238,11 +238,11 @@ export default function RequirementsDialog(props: IRequirementsDialogProps) {
           style={{ overscrollBehavior: "contain" }}
         >
           {data.rows.map((row, index) => {
-            const isIgnored = ignored.indexOf(row.modId) !== -1;
-            const checked = selected.indexOf(row.modId) !== -1 && !isIgnored;
-            const isRequested = requested.indexOf(row.modId) !== -1;
-            const isBusy = busy.indexOf(row.modId) !== -1;
             const canBeIgnored = isIgnorable(row);
+            const isIgnored = canBeIgnored && ignored.indexOf(row.modId) !== -1;
+            const checked = selected.indexOf(row.modId) !== -1 && !isIgnored;
+            const isRequested = canBeIgnored && requested.indexOf(row.modId) !== -1;
+            const isBusy = busy.indexOf(row.modId) !== -1;
             const canDownload =
               canBeIgnored && !isIgnored && !isRequested && !isBusy;
 

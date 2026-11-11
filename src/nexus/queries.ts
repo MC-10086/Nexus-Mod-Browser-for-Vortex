@@ -29,7 +29,7 @@ query SearchMods($filter: ModsFilter, $sort: [ModsSort!], $offset: Int, $count: 
       updatedAt
       pictureUrl
       game { id domainName }
-      uploader { name }
+      uploader { name memberId }
     }
   }
 }`;
@@ -129,16 +129,7 @@ query ResolveGame($domainName: String) {
   }
 }`;
 
-/**
- * 把搜索框里的内容拆成独立关键词。
- *
- * 单关键词用 `WILDCARD OR MATCHES`：`WILDCARD` 保留前缀/部分匹配，
- * `MATCHES` 负责 N 网把复合名称拆词的情况（例如 `HunterPie` 在
- * nameStemmed 里不是一个完整的词，单独用 `WILDCARD` 会返回 0）。
- * 多关键词不能把整句塞进一个 `WILDCARD`（`*Combat Pathing Revolution*`
- * 是整串字面通配，分词字段匹配不到），改用 `MATCHES`：N 网会要求
- * 所有词都出现，顺序不限，且按词干匹配。
- */
+/** 提取字母与数字，保留原顺序并忽略大小写重复项。 */
 function searchTokens(query: string): string[] {
   const words = query.match(/[\p{L}\p{N}]+/gu) ?? [];
   const seen: { [word: string]: true } = {};
@@ -165,15 +156,15 @@ function searchTokens(query: string): string[] {
  *
  * filter 是一棵布尔表达式树：
  *   - `gameDomainName` 精确匹配游戏
- *   - 单关键词：`nameStemmed` 的 `WILDCARD OR MATCHES`
- *   - 多关键词：`nameStemmed + MATCHES`（所有词都要出现，顺序不限，按词干匹配）
+ *   - 名称匹配取原始标题子串与词干匹配的并集
  *
- * 关键词为空时不加名称条件，等价于"按排序浏览该游戏"。
+ * 只有空关键词才浏览全部。纯标点返回 undefined，由服务层直接返回空结果。
  */
 export function buildSearchVariables(options: {
   domain: string;
   query: string;
   sortField: string;
+  uploaderId?: number;
   offset: number;
   count: number;
 }) {
@@ -181,24 +172,40 @@ export function buildSearchVariables(options: {
     { gameDomainName: [{ value: options.domain, op: "EQUALS" }] },
   ];
 
+  if (options.uploaderId !== undefined) {
+    conditions.push({ uploaderId: [{ value: String(options.uploaderId), op: "EQUALS" }] });
+  }
+
   const keyword = options.query.trim();
-  const tokens = searchTokens(keyword);
-  if (tokens.length === 1) {
-    // 两种 op 取并集：既支持 "HunterP" 这种前缀，也支持 "HunterPie" 这种被拆词的复合名
-    conditions.push({
-      op: "OR",
-      filter: [
-        { nameStemmed: [{ value: tokens[0], op: "WILDCARD" }] },
-        { nameStemmed: [{ value: tokens[0], op: "MATCHES" }] },
-      ],
-    });
-  } else if (tokens.length > 1) {
-    // 使用整句而不是 token 数组：MATCHES 的语义就是“所有词都出现、顺序不限”
-    conditions.push({ nameStemmed: [{ value: keyword, op: "MATCHES" }] });
+  if (keyword !== "") {
+    const tokens = searchTokens(keyword);
+    if (tokens.length === 0) {
+      return undefined;
+    }
+
+    const single = tokens.length === 1;
+    const stemmed = single ? tokens[0] : keyword;
+    const matches: any[] = [{ nameStemmed: [{ value: stemmed, op: "MATCHES" }] }];
+    const canUseWildcard = (value: string) => Array.from(value).length >= 2;
+    const titleContains = (value: string) => ({ name: [{ value, op: "WILDCARD" }] });
+
+    // Nexus 的 WILDCARD 本身做子串匹配，星号会当作标题里的字符。
+    if (single && canUseWildcard(stemmed)) {
+      matches.push({ nameStemmed: [{ value: stemmed, op: "WILDCARD" }] });
+      matches.push(titleContains(stemmed));
+    } else if (!single && tokens.every(canUseWildcard)) {
+      matches.push({ op: "AND", filter: tokens.map(titleContains) });
+    } else if (!single) {
+      // 单字符不能独立做 WILDCARD，保留整段输入以支持 "immersive f" 和 "2.0"。
+      const phrase = keyword.replace(/^\*+|\*+$/g, "").trim();
+      matches.push(titleContains(phrase));
+    }
+
+    conditions.push(matches.length === 1 ? matches[0] : { op: "OR", filter: matches });
   }
 
   // relevance 只在有关键词时才有意义，否则 Nexus 会返回不稳定顺序
-  const sortField = tokens.length === 0 && options.sortField === "relevance"
+  const sortField = keyword === "" && options.sortField === "relevance"
     ? "endorsements"
     : options.sortField;
 

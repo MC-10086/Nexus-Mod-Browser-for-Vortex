@@ -32,12 +32,14 @@ https.request = function fakeRequest(options, callback) {
     requestCount += 1;
     const parsed = JSON.parse(body);
     const reply = responder(parsed.query, parsed.variables);
-    const res = new EventEmitter();
-    res.statusCode = reply.status;
-    process.nextTick(() => {
-      callback(res);
-      res.emit("data", Buffer.from(JSON.stringify(reply.body)));
-      res.emit("end");
+    Promise.resolve(reply).then((response) => {
+      const res = new EventEmitter();
+      res.statusCode = response.status;
+      process.nextTick(() => {
+        callback(res);
+        res.emit("data", Buffer.from(JSON.stringify(response.body)));
+        res.emit("end");
+      });
     });
   };
   return req;
@@ -79,70 +81,65 @@ async function testAsync(name, fn) {
 // 2) 纯函数
 // ---------------------------------------------------------------------------
 console.log("\n[1] 查询变量构造");
-test("单关键词：AND + gameDomainName + (WILDCARD OR MATCHES)", () => {
-  const vars = buildSearchVariables({
-    domain: "skyrimspecialedition",
-    query: "weather",
-    sortField: "relevance",
-    offset: 0,
-    count: 24,
+function cyberpunkSearch(query) {
+  return buildSearchVariables({
+    domain: "cyberpunk2077", query, sortField: "relevance", offset: 0, count: 24,
   });
-  assert.strictEqual(vars.filter.op, "AND");
-  assert.strictEqual(vars.filter.filter.length, 2);
-  assert.strictEqual(vars.filter.filter[0].gameDomainName[0].value, "skyrimspecialedition");
-  assert.strictEqual(vars.filter.filter[1].op, "OR");
-  assert.deepStrictEqual(
-    vars.filter.filter[1].filter.map((c) => [c.nameStemmed[0].op, c.nameStemmed[0].value]),
-    [["WILDCARD", "weather"], ["MATCHES", "weather"]],
-  );
-  assert.deepStrictEqual(vars.sort, [{ relevance: { direction: "DESC" } }]);
-  assert.strictEqual(vars.count, 24);
+}
+
+test("单词补全匹配原始标题，并保留已有词干匹配", () => {
+  for (const word of ["cyberfall", "wallrunn", "immersi", "HunterPie"]) {
+    const vars = cyberpunkSearch(word);
+    assert.deepStrictEqual(vars.filter, {
+      op: "AND",
+      filter: [
+        { gameDomainName: [{ value: "cyberpunk2077", op: "EQUALS" }] },
+        {
+          op: "OR",
+          filter: [
+            { nameStemmed: [{ value: word, op: "MATCHES" }] },
+            { nameStemmed: [{ value: word, op: "WILDCARD" }] },
+            { name: [{ value: word, op: "WILDCARD" }] },
+          ],
+        },
+      ],
+    });
+    assert.deepStrictEqual(vars.sort, [{ relevance: { direction: "DESC" } }]);
+    assert.strictEqual(vars.count, 24);
+  }
 });
 
-test("复合单词 HunterPie 同时走 WILDCARD / MATCHES", () => {
-  const vars = buildSearchVariables({
-    domain: "monsterhunterworld",
-    query: "HunterPie",
-    sortField: "relevance",
-    offset: 0,
-    count: 24,
-  });
-  assert.strictEqual(vars.filter.filter[1].op, "OR");
-  assert.deepStrictEqual(
-    vars.filter.filter[1].filter.map((c) => [c.nameStemmed[0].op, c.nameStemmed[0].value]),
-    [["WILDCARD", "HunterPie"], ["MATCHES", "HunterPie"]],
-  );
+test("多词未输完可逐词匹配原始标题，并保留完整词干查询", () => {
+  for (const [query, words] of [
+    ["always arasak", ["always", "arasak"]],
+    ["once alwa", ["once", "alwa"]],
+    ["immersive firs", ["immersive", "firs"]],
+    ["Combat Pathing Revolution", ["Combat", "Pathing", "Revolution"]],
+    ["Combat  combat, Pathing!", ["Combat", "Pathing"]],
+  ]) {
+    assert.deepStrictEqual(cyberpunkSearch(query).filter.filter[1], {
+      op: "OR",
+      filter: [
+        { nameStemmed: [{ value: query, op: "MATCHES" }] },
+        { op: "AND", filter: words.map((value) => ({ name: [{ value, op: "WILDCARD" }] })) },
+      ],
+    });
+  }
 });
 
-test("多词查询：使用 MATCHES 匹配完整名称", () => {
-  const vars = buildSearchVariables({
-    domain: "skyrimspecialedition",
-    query: "Combat Pathing Revolution",
-    sortField: "relevance",
-    offset: 0,
-    count: 24,
+test("单字符只参与词干或整段匹配，版本号保留标点", () => {
+  assert.deepStrictEqual(cyberpunkSearch("f").filter.filter[1], {
+    nameStemmed: [{ value: "f", op: "MATCHES" }],
   });
-  assert.strictEqual(vars.filter.filter.length, 2, "游戏 + 一个 MATCHES 条件");
-  assert.strictEqual(vars.filter.filter[1].nameStemmed[0].op, "MATCHES");
-  assert.strictEqual(
-    vars.filter.filter[1].nameStemmed[0].value,
-    "Combat Pathing Revolution",
-  );
-});
-
-test("多词保留原始查询串，由 N 网负责分词", () => {
-  const vars = buildSearchVariables({
-    domain: "skyrimspecialedition",
-    query: "Combat  combat, Pathing!",
-    sortField: "relevance",
-    offset: 0,
-    count: 24,
-  });
-  assert.strictEqual(vars.filter.filter[1].nameStemmed[0].op, "MATCHES");
-  assert.strictEqual(
-    vars.filter.filter[1].nameStemmed[0].value,
-    "Combat  combat, Pathing!",
-  );
+  for (const query of ["once a", "immersive f", "2.0"]) {
+    assert.deepStrictEqual(cyberpunkSearch(query).filter.filter[1], {
+      op: "OR",
+      filter: [
+        { nameStemmed: [{ value: query, op: "MATCHES" }] },
+        { name: [{ value: query, op: "WILDCARD" }] },
+      ],
+    });
+  }
 });
 
 test("空关键词 + relevance → 回退到 endorsements 排序", () => {
@@ -373,6 +370,19 @@ function defaultResponder(query, variables) {
 async function main() {
   console.log("\n[4] NexusService（假 https）");
 
+  await testAsync("纯标点直接返回空结果，空白输入仍请求游戏列表", async () => {
+    responder = defaultResponder;
+    const service = new NexusService(() => undefined);
+    const options = { domain: "cyberpunk2077", sortField: "endorsements", offset: 0, count: 24 };
+    const before = requestCount;
+    for (const query of ["-", ".", "***.***", "  ***-***  "]) {
+      assert.deepStrictEqual(await service.search({ ...options, query }), { totalCount: 0, nodes: [] });
+    }
+    assert.strictEqual(requestCount, before);
+    assert.strictEqual((await service.search({ ...options, query: "  " })).totalCount, 1);
+    assert.strictEqual(requestCount, before + 1);
+  });
+
   await testAsync("search 解析 totalCount / nodes", async () => {
     responder = defaultResponder;
     const service = new NexusService(() => "fake-key");
@@ -385,6 +395,36 @@ async function main() {
     });
     assert.strictEqual(result.totalCount, 1);
     assert.strictEqual(result.nodes[0].name, "A Mod");
+  });
+
+  await testAsync("上传者作品按游戏和会员 ID 精确筛选，分页和普通搜索各自缓存", async () => {
+    const received = [];
+    responder = (query, variables) => {
+      assert.match(query, /uploader\s*\{\s*name\s+memberId\s*\}/);
+      received.push(variables);
+      return defaultResponder(query, variables);
+    };
+    try {
+      const service = new NexusService(() => undefined);
+      const options = { domain: "skyrimspecialedition", query: "", sortField: "updatedAt", offset: 0, count: 24 };
+      await service.search(options);
+      await service.search({ ...options, uploaderId: 42 });
+      await service.search({ ...options, uploaderId: 42 });
+      await service.search({ ...options, uploaderId: 42, offset: 24 });
+      await service.search({ ...options, uploaderId: 43 });
+      assert.deepStrictEqual(received.map((v) => v.offset), [0, 0, 24, 0]);
+      assert.deepStrictEqual(received.map((v) => v.filter.filter[1]?.uploaderId?.[0].value), [undefined, "42", "42", "43"]);
+      assert.deepStrictEqual(received[1].filter, {
+        op: "AND",
+        filter: [
+          { gameDomainName: [{ value: "skyrimspecialedition", op: "EQUALS" }] },
+          { uploaderId: [{ value: "42", op: "EQUALS" }] },
+        ],
+      });
+      assert.deepStrictEqual(received[1].sort, [{ updatedAt: { direction: "DESC" } }]);
+    } finally {
+      responder = defaultResponder;
+    }
   });
 
   await testAsync("相同查询走缓存，不重复请求", async () => {
@@ -416,6 +456,41 @@ async function main() {
     const before = requestCount;
     await Promise.all([service.search(options), service.search(options), service.search(options)]);
     assert.strictEqual(requestCount - before, 1, "并发应合并为一次请求");
+  });
+
+  await testAsync("刷新后旧响应不能覆盖缓存或解除新请求的去重", async () => {
+    const options = { domain: "skyrimspecialedition", query: "armor", sortField: "endorsements", offset: 0, count: 24 };
+    const reply = (name) => ({ status: 200, body: { data: { mods: { totalCount: 1, nodes: [{ ...MOD_A, name }] } } } });
+    try {
+      for (const oldFinishesFirst of [true, false]) {
+        const pending = [];
+        responder = () => new Promise((resolve) => pending.push(resolve));
+        const service = new NexusService(() => undefined);
+        const old = service.search(options);
+        service.clear();
+        const fresh = service.search(options);
+        assert.strictEqual(pending.length, 2);
+
+        if (oldFinishesFirst) {
+          pending[0](reply("old"));
+          await old;
+          assert.strictEqual(service.search(options), fresh, "仍应复用刷新后的在途请求");
+          pending[1](reply("new"));
+          await fresh;
+        } else {
+          pending[1](reply("new"));
+          await fresh;
+          pending[0](reply("old"));
+          await old;
+        }
+
+        const cached = service.search(options);
+        assert.strictEqual(pending.length, 2, "刷新后的结果应已缓存");
+        assert.strictEqual((await cached).nodes[0].name, "new");
+      }
+    } finally {
+      responder = defaultResponder;
+    }
   });
 
   await testAsync("resolveGame 只请求一次，后续详情复用", async () => {
@@ -587,7 +662,7 @@ async function main() {
     assert.strictEqual(startedCount, 0, "下载开始前 onStarted 不应触发");
 
     // 下载记录出现（started）→ 触发一次
-    state.persistent.downloads.files["dl-9"] = { modInfo: { modId: 7, fileId: 8 }, state: "started" };
+    state.persistent.downloads.files["dl-9"] = { modInfo: { game: "skyrimse", modId: 7, fileId: 8 }, state: "started" };
     await wait(200);
     assert.strictEqual(startedCount, 1, "下载开始时 onStarted 应触发一次");
     assert.strictEqual(startedId, "dl-9");
@@ -619,7 +694,7 @@ async function main() {
     );
 
     state.persistent.downloads.files["dl-11"] = {
-      modInfo: { modId: 11, fileId: 12 },
+      modInfo: { game: "skyrimse", modId: 11, fileId: 12 },
       state: "started",
     };
     await wait(180);
@@ -653,6 +728,29 @@ async function main() {
     assert.strictEqual(outcome.pending, true);
   });
 
+  await testAsync("超时后迟到的宿主回调不会更新状态、通知或安装", async () => {
+    const state = { persistent: { downloads: { files: {} } } };
+    const starts = [];
+    const installs = [];
+    const errors = [];
+    let callback;
+    const api = makeBridgeApi(state, ([event, id, , , done]) => {
+      if (event === "start-download") {
+        callback = done;
+      } else {
+        installs.push(id);
+      }
+    });
+    api.showErrorNotification = (message) => errors.push(message);
+    const outcome = await downloadModFile(api, {
+      domain: "skyrimspecialedition", internalGameId: "skyrimse", modId: 21, fileId: 22, autoInstall: true,
+    }, { startTimeoutMs: 20, pollIntervalMs: 5, onStarted: (id) => starts.push(id) });
+    assert.strictEqual(outcome.timedOut, true);
+    callback(null, "late-record");
+    callback(new Error("late error"));
+    assert.deepStrictEqual({ starts, installs, errors }, { starts: [], installs: [], errors: [] });
+  });
+
   await testAsync("下载已开始后不会被 startTimeout 打断", async () => {
     const state = {
       session: { nexus: { freeUserDLQueue: [] } },
@@ -672,7 +770,7 @@ async function main() {
     );
 
     state.persistent.downloads.files["dl-23"] = {
-      modInfo: { modId: 23, fileId: 24 },
+      modInfo: { game: "skyrimse", modId: 23, fileId: 24 },
       state: "started",
     };
 
@@ -1008,7 +1106,7 @@ async function main() {
     await wait(150);
     assert.strictEqual(started, 0, "下载未开始时不应切换按钮");
 
-    state.persistent.downloads.files["d9"] = { modInfo: { modId: 9, fileId: 10 }, state: "started" };
+    state.persistent.downloads.files["d9"] = { modInfo: { game: "skyrimse", modId: 9, fileId: 10 }, state: "started" };
     await wait(150);
     assert.strictEqual(started, 1, "记录出现后应触发一次 onStarted");
 
@@ -1118,7 +1216,7 @@ async function main() {
 
     // 关键：没有顶层 modId/fileId，只有 nexus.ids
     state.persistent.downloads.files["d9"] = {
-      modInfo: { source: "nexus", nexus: { ids: { modId: 9, fileId: 10 } } },
+      game: ["g"], modInfo: { source: "nexus", nexus: { ids: { modId: 9, fileId: 10 } } },
       state: "started",
     };
     await wait(150);
@@ -1127,6 +1225,47 @@ async function main() {
     state.persistent.downloads.files["d9"].state = "finished";
     const outcome = await Promise.race([pending, wait(3000).then(() => "timeout")]);
     assert.strictEqual(outcome.downloadId, "d9");
+  });
+
+  await testAsync("浏览器重试只认领当前游戏的新记录，跳过旧失败和其他游戏记录", async () => {
+    const ids = { gameId: 1704, modId: 9, fileId: 10 };
+    const record = (game, state) => ({ game: [game], state, modInfo: { nexus: { ids } } });
+    const files = { other: record("skyrimse", "finished"), old: record("skyrimvr", "failed") };
+    const starts = [];
+    const installs = [];
+    const api = makeBridgeApi({ persistent: { downloads: { files } } }, ([event, id, , callback]) => {
+      assert.strictEqual(event, "start-install-download");
+      installs.push(id);
+      callback(null, "installed-mod");
+    });
+    const pending = downloadViaBrowser(api, {
+      domain: "skyrimspecialedition", internalGameId: "skyrimvr", modId: 9, fileId: 10, autoInstall: true,
+    }, { openBrowser: () => {}, startTimeoutMs: 500, pollIntervalMs: 5, onStarted: (id) => starts.push(id) });
+
+    await wait(25);
+    assert.deepStrictEqual(starts, []);
+    assert.deepStrictEqual(installs, []);
+    files.retry = record("skyrimvr", "finished");
+    const outcome = await pending;
+    assert.strictEqual(outcome.downloadId, "retry");
+    assert.deepStrictEqual(starts, ["retry"]);
+    assert.deepStrictEqual(installs, ["retry"]);
+  });
+
+  await testAsync("旧失败记录重新开始后可被认领，下载再次失败时正常结束", async () => {
+    const record = { state: "failed", modInfo: { game: "skyrimvr", modId: 9, fileId: 10 } };
+    const api = makeBridgeApi({ persistent: { downloads: { files: { retry: record } } } }, () => {});
+    const starts = [];
+    const outcome = await downloadViaBrowser(api, {
+      domain: "skyrimspecialedition", internalGameId: "skyrimvr", modId: 9, fileId: 10, autoInstall: false,
+    }, {
+      openBrowser: () => { record.state = "started"; },
+      startTimeoutMs: 100,
+      pollIntervalMs: 5,
+      onStarted: (id) => { starts.push(id); record.state = "failed"; },
+    });
+    assert.deepStrictEqual(starts, ["retry"]);
+    assert.deepStrictEqual(outcome, {});
   });
 
   test("两条路径的等待超时统一为 2 分钟", () => {
@@ -1156,7 +1295,7 @@ async function main() {
     );
 
     state.persistent.downloads.files["d9"] = {
-      modInfo: { nexus: { ids: { modId: 9, fileId: 10 } } },
+      modInfo: { game: "g", nexus: { ids: { modId: 9, fileId: 10 } } },
       state: "finished",
     };
 
@@ -1362,6 +1501,23 @@ async function main() {
     assert.strictEqual(rows.some((row) => row.name === "Self"), false);
   });
 
+  test("跨游戏同号的前置保留，只排除同游戏的自引用", () => {
+    const rows = buildRows({ ...REQ_INFO, nexus: [
+      { gameId: "9999", modId: "266", modName: "Other game's MOD" },
+      { gameId: "1704", modId: "266", modName: "Current game's requirement" },
+      { modId: "266", modName: "Duplicate in current game" },
+      { gameId: "8888", modId: "266", modName: "Third game's MOD" },
+      { gameId: "9999", modId: "100", modName: "Other game's same ID" },
+      { gameId: "1704", modId: "100", modName: "Self" },
+    ] });
+    assert.deepStrictEqual(rows.map((row) => [row.kind, row.name]), [
+      ["missing", "Current game's requirement"],
+      ["otherGame", "Other game's MOD"],
+      ["otherGame", "Third game's MOD"],
+      ["otherGame", "Other game's same ID"],
+    ]);
+  });
+
   test("DLC 去重 + 实体解码", () => {
     const dlc = reqUtil.buildDlcRows(REQ_INFO);
     assert.strictEqual(dlc.length, 1);
@@ -1503,6 +1659,45 @@ async function main() {
     );
     assert.deepStrictEqual(state.manualRequirements, {});
     assert.deepStrictEqual(prefsState.prefsSlice({}), prefsState.PREFS_DEFAULTS);
+  });
+
+  await testAsync("前置下载只对同一游戏的有效记录去重", async () => {
+    const { startRequirementDownload } = require("../dist/ui/requirementsPrompt");
+    const { resetNexusService } = require("../dist/nexus/index");
+    const context = { domain: "skyrimspecialedition", internalGameId: "skyrimse" };
+    const row = { kind: "missing", modId: 123, name: "Required mod", downloadable: true };
+    const ids = { modId: "123", fileId: "77", gameId: "1704" };
+    const cases = [
+      [{ state: "finished", modInfo: { game: "skyrimse", modId: 123 } }, true],
+      [{ state: "started", modInfo: { game: "skyrimse", nexus: { ids } } }, true],
+      [{ state: "finished", game: ["skyrimse"], modInfo: { nexus: { ids } } }, true],
+      [{ state: "finished", game: ["skyrimse", "skyrimvr"], modInfo: { game: "skyrimvr", nexus: { ids } } }, false],
+      [{ state: "finished", modInfo: { game: "cyberpunk2077", modId: 123 } }, false],
+      [{ state: "finished", modInfo: { modId: 123 } }, false],
+      [{ state: "failed", modInfo: { game: "skyrimse", modId: 123 } }, false],
+    ];
+    let fileLookups = 0;
+    responder = (query, variables) => {
+      if (query.includes("ModFiles")) {
+        fileLookups += 1;
+        return { status: 200, body: { data: { modFiles: [] } } };
+      }
+      return defaultResponder(query, variables);
+    };
+    try {
+      for (const [record, deduped] of cases) {
+        const api = {
+          getState: () => ({ persistent: { downloads: { files: { record } } } }),
+          sendNotification: () => {},
+        };
+        resetNexusService(api);
+        const before = fileLookups;
+        assert.strictEqual(await startRequirementDownload(api, context, row), deduped);
+        assert.strictEqual(fileLookups - before, deduped ? 0 : 1);
+      }
+    } finally {
+      responder = defaultResponder;
+    }
   });
 
   await testAsync("buildRequirementsPromptData：查询 + 行模型 + DLC", async () => {

@@ -79,3 +79,10 @@ export function isNexusModInstalled(
 ): boolean {
   return installedNexusModIds(state, gameId).indexOf(nexusModId) !== -1;
 }
+
+/** 下载记录的明确游戏目标。多个兼容游戏无法用来判断实际下载到了哪个游戏。 */
+export function downloadRecordGame(record: any): string | undefined {
+  const game = record?.modInfo?.game ?? record?.game;
+  const target = Array.isArray(game) && game.length === 1 ? game[0] : game;
+  return typeof target === "string" && target.length > 0 ? target : undefined;
+}
